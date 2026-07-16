@@ -1,0 +1,557 @@
+/* 担当Phase2エージェントが実装する。対応SPEC.md: 9章(アクセシビリティ・UI要件) */
+
+/* -------------------------------------------------------------------------
+   デザインコンセプト: 「夜の探検隊の道具」
+   カメラ映像(現実の部屋)の上に載る真鍮と羊皮紙のHUD。単一ダークテーマ。
+   ------------------------------------------------------------------------- */
+
+:root {
+  --ink: #0f1520;
+  --ink-panel: rgba(15, 21, 32, 0.82);
+  --ink-panel-strong: rgba(15, 21, 32, 0.92);
+  --paper: #f0e9d8;
+  --brass: #c9a24b;
+  --dim: #97907e;
+  --danger: #b8462e;
+
+  /* レーダー色(SPEC 3.5固定) */
+  --radar-far: #3e7bd6;
+  --radar-mid: #d6b93e;
+  --radar-near: #d67b2e;
+  --radar-hot: #d63e3e;
+
+  --font-jp: 'Yu Gothic UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --radius: 2px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--font-jp);
+  overscroll-behavior: none;
+}
+
+body {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+}
+
+button {
+  font-family: inherit;
+}
+
+a {
+  color: var(--brass);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* -------------------------------------------------------------------------
+   画面(フェーズ)の切り替え
+   ------------------------------------------------------------------------- */
+
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  padding: max(16px, env(safe-area-inset-top)) 20px max(16px, env(safe-area-inset-bottom));
+}
+
+.screen.active {
+  display: flex;
+}
+
+/* title / settings / result / error はカメラ映像がない(またはARの下地がない)ため、
+   読みやすさ優先で不透明の地を敷く */
+.screen-title,
+.screen-settings,
+.screen-result,
+.screen-error {
+  background: var(--ink);
+}
+
+/* -------------------------------------------------------------------------
+   見出し・眉ラベル
+   ------------------------------------------------------------------------- */
+
+.eyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass);
+}
+
+.eyebrow-sub {
+  margin-top: 12px;
+  color: var(--dim);
+}
+
+.title-head {
+  text-align: left;
+  margin-top: 12px;
+}
+
+.title-head-compact {
+  margin-top: 4px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.2;
+  color: var(--paper);
+  font-weight: 700;
+}
+
+h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--paper);
+}
+
+p,
+li {
+  line-height: 1.7;
+  max-width: 34em;
+}
+
+/* -------------------------------------------------------------------------
+   タイトル画面
+   ------------------------------------------------------------------------- */
+
+.screen-title {
+  justify-content: space-between;
+}
+
+.howto {
+  margin-top: 24px;
+  overflow-y: auto;
+}
+
+.howto ol {
+  margin: 4px 0 12px;
+  padding-left: 1.2em;
+  color: var(--paper);
+}
+
+.notice {
+  color: var(--dim);
+  font-size: 13px;
+}
+
+.bottom-bar {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.start-reason {
+  color: var(--danger);
+  font-size: 13px;
+  min-height: 1.2em;
+  margin: 0 0 8px;
+}
+
+/* -------------------------------------------------------------------------
+   ボタン
+   ------------------------------------------------------------------------- */
+
+.button-row {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0 18px;
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--ink-panel-strong);
+  border-left: 3px solid var(--brass);
+  font-weight: 700;
+}
+
+.btn-large {
+  flex: 1;
+  min-height: 56px;
+  font-size: 16px;
+}
+
+/* -------------------------------------------------------------------------
+   設定画面
+   ------------------------------------------------------------------------- */
+
+.settings-scroll {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 16px;
+}
+
+.settings-form {
+  display: grid;
+  grid-template-columns: minmax(96px, auto) 1fr auto;
+  align-items: center;
+  gap: 14px 12px;
+}
+
+.field-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+}
+
+.field-row label {
+  font-size: 13px;
+  color: var(--paper);
+}
+
+.field-range {
+  width: 100%;
+  accent-color: var(--brass);
+}
+
+.field-value {
+  min-width: 5em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--brass);
+  font-size: 13px;
+}
+
+.field-row-toggles {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 24px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(201, 162, 75, 0.3);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--paper);
+}
+
+.toggle-label input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brass);
+}
+
+/* -------------------------------------------------------------------------
+   HUD(隠す/探すターン共通)
+   ------------------------------------------------------------------------- */
+
+.hud-corner {
+  position: absolute;
+  z-index: 5;
+}
+
+.hud-tl {
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+}
+
+.timer-pad {
+  background: var(--ink-panel);
+  border-bottom: 1px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 6px 12px;
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--paper);
+}
+
+.guide-pad {
+  align-self: center;
+  margin-top: auto;
+  margin-bottom: auto;
+  background: var(--ink-panel);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 14px;
+  color: var(--paper);
+  text-align: center;
+}
+
+/* -------------------------------------------------------------------------
+   手渡し画面: 覗き見防止のため完全不透明
+   ------------------------------------------------------------------------- */
+
+.screen-handover.opaque {
+  background: #0f1520;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.screen-handover .eyebrow {
+  text-align: center;
+}
+
+.handover-warning {
+  max-width: 28em;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--danger);
+  background: rgba(184, 70, 46, 0.12);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+}
+
+.screen-handover .bottom-bar {
+  width: 100%;
+  margin-top: 32px;
+}
+
+.screen-handover .button-row {
+  justify-content: center;
+}
+
+/* -------------------------------------------------------------------------
+   探すターン: レーダーボタン・グロー・クールダウン
+   ------------------------------------------------------------------------- */
+
+.screen-seek {
+  padding: 0;
+}
+
+.screen-seek .hud-tl {
+  padding: max(12px, env(safe-area-inset-top)) 0 0 12px;
+  position: absolute;
+}
+
+.radar-btn {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--ink-panel-strong);
+  border: 2px solid var(--brass);
+  z-index: 6;
+}
+
+.radar-btn::before {
+  content: '';
+  position: absolute;
+  inset: 18px;
+  border: 2px solid var(--brass);
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+.cooldown-wrap {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right));
+  bottom: max(24px, env(safe-area-inset-bottom));
+  width: 80px;
+  height: 80px;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.cooldown-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.cooldown-ring-bg {
+  fill: none;
+  stroke: rgba(240, 233, 216, 0.15);
+  stroke-width: 3;
+}
+
+.cooldown-ring-fg {
+  fill: none;
+  stroke: var(--paper);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.2s linear;
+}
+
+.radar-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.15s linear;
+}
+
+.radar-glow.active {
+  opacity: 1;
+}
+
+.radar-glow.level-far {
+  box-shadow: inset 0 0 24px 6px var(--radar-far);
+  animation: glow-blink 2s ease-in-out infinite;
+}
+
+.radar-glow.level-mid {
+  box-shadow: inset 0 0 34px 10px var(--radar-mid);
+  animation: glow-blink 1s ease-in-out infinite;
+}
+
+.radar-glow.level-near {
+  box-shadow: inset 0 0 46px 16px var(--radar-near);
+  animation: glow-blink 0.4s ease-in-out infinite;
+}
+
+.radar-glow.level-hot {
+  box-shadow: inset 0 0 60px 24px var(--radar-hot);
+  animation: glow-blink 0.2s ease-in-out infinite;
+}
+
+@keyframes glow-blink {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radar-glow {
+    animation: none !important;
+    transition: none;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   結果 / エラー画面
+   ------------------------------------------------------------------------- */
+
+.screen-result {
+  justify-content: space-between;
+}
+
+.result-message {
+  font-size: 26px;
+  margin-top: 8px;
+}
+
+.error-message {
+  color: var(--danger);
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.error-guide {
+  margin-top: 16px;
+  overflow-y: auto;
+  border-top: 1px solid rgba(201, 162, 75, 0.3);
+  padding-top: 12px;
+}
+
+.error-guide p {
+  font-size: 13px;
+  color: var(--paper);
+}
+
+.error-guide strong {
+  color: var(--brass);
+}
+
+/* -------------------------------------------------------------------------
+   トースト
+   ------------------------------------------------------------------------- */
+
+.toast-container {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: max(96px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 50;
+  pointer-events: none;
+}
+
+.toast {
+  background: var(--ink-panel-strong);
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--paper);
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* -------------------------------------------------------------------------
+   縦向き固定の案内(SPEC 9.3)
+   ------------------------------------------------------------------------- */
+
+.landscape-warning {
+  display: none;
+}
+
+@media (orientation: landscape) {
+  .landscape-warning {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    background: var(--ink);
+    color: var(--paper);
+    text-align: center;
+    font-size: 18px;
+  }
+}
