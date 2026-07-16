@@ -353,6 +353,74 @@ li {
   font-size: 13px;
 }
 
+.field-row-mode {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 4px;
+  padding-bottom: 14px;
+  border-bottom: 2px solid rgba(42, 22, 8, 0.3);
+}
+
+.field-mode-legend {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-soft);
+}
+
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.mode-option {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 2px solid var(--brass);
+  background: rgba(243, 230, 200, 0.35);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink);
+  text-align: center;
+  min-height: 60px;
+  justify-content: center;
+}
+
+.mode-option-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mode-option .icon {
+  width: 26px;
+  height: 26px;
+}
+
+.mode-option input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.mode-option:has(input:checked) {
+  background: var(--brass-bright);
+  color: var(--iron);
+  box-shadow: inset 0 0 0 2px var(--ink);
+}
+
 .field-row-toggles {
   grid-column: 1 / -1;
   display: flex;

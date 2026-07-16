@@ -1,7 +1,9 @@
 // エントリポイント。全モジュールの配線を行う。対応SPEC.md: セクション3(ゲームルール), 5(画面遷移)
+import type { Scene } from 'three';
 import { ARSession, type ARSessionCallbacks, type ARFrameHook } from './ar/session';
 import { TreasureAnchor } from './ar/anchor';
 import { TreasureView } from './scene/treasure';
+import { CoinView } from './scene/coin';
 import { DigMarks } from './scene/digMarks';
 import { GameStateMachine, type StateChangeCtx } from './game/state';
 import { TurnTimer } from './game/timer';
@@ -10,7 +12,11 @@ import { computeRadar } from './game/radar';
 import { Beeper } from './audio/beeper';
 import { OverlayUI, icon, type UIActions } from './ui/overlay';
 import { loadSettings, saveSettings } from './settings';
-import type { GamePhase, GameSettings, Vec3 } from './types';
+import type { GamePhase, GameSettings, ITreasureView, Vec3 } from './types';
+
+function createTreasureView(mode: GameSettings['gameMode'], scene: Scene): ITreasureView {
+  return mode === 'coin' ? new CoinView(scene) : new TreasureView(scene);
+}
 
 const NOT_SUPPORTED_REASON =
   'この端末はAR機能(WebXR immersive-ar)に対応していません。ARCore対応のAndroid Chromeが必要です。';
@@ -43,7 +49,7 @@ const timer = new TurnTimer();
 
 interface TreasureSlot {
   anchor: TreasureAnchor;
-  view: TreasureView;
+  view: ITreasureView;
   found: boolean;
 }
 
@@ -205,7 +211,7 @@ function handleSelect(hit: Vec3 | null): void {
     if (treasures.length < settings.treasureCount) {
       const slot: TreasureSlot = {
         anchor: new TreasureAnchor(),
-        view: new TreasureView(session!.getScene()),
+        view: createTreasureView(settings.gameMode, session!.getScene()),
         found: false,
       };
       void slot.anchor.place(hit, hitResult);
@@ -245,7 +251,7 @@ function finishHideTurn(placed: boolean): void {
 function handleSeekSelect(hit: Vec3 | null): void {
   if (!judge || judge.isCoolingDown()) return;
   if (!hit) {
-    overlay.toast(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを少し動かしてね`);
+    overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
     return;
   }
 
@@ -265,9 +271,11 @@ function handleSeekSelect(hit: Vec3 | null): void {
   if (bestSlot) {
     handleSeekSuccess(bestSlot);
   } else {
-    // showMissは位置にダストを出すだけの演出でどのTreasureViewでも等価に使える
+    // showMissは位置にダストを出すだけの演出。コインモードでは「掘る」概念がないためno-opになる
     treasures[0].view.showMiss(hit);
-    digMarks?.addDigMark(hit);
+    if (settings.gameMode === 'chest') {
+      digMarks?.addDigMark(hit);
+    }
     beeper.playMiss();
     judge.startCooldown();
   }
@@ -284,7 +292,7 @@ function stopSeekLoops(): void {
 function handleSeekSuccess(slot: TreasureSlot): void {
   slot.found = true;
   const pos = slot.anchor.getPosition();
-  if (pos) slot.view.reveal(pos);
+  if (pos) slot.view.collect(pos);
   beeper.playPop();
   setTimeout(() => beeper.playSuccess(), 250);
 
@@ -309,7 +317,10 @@ function onSeekTimeExpire(): void {
     const pos = t.anchor.getPosition();
     if (pos) t.view.reveal(pos);
   }
-  beeper.playPop();
+  // コインモードは常時可視のため、時間切れ時の「ポンッ」演出は宝箱モードのみ鳴らす
+  if (settings.gameMode === 'chest') {
+    beeper.playPop();
+  }
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
     state.finishSeek('hider-win');

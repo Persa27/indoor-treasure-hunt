@@ -1,6 +1,6 @@
 // 担当Phase2エージェントが実装する。対応SPEC.md: 3.2, 3.4(埋める/掘り出す演出), 6.5(宝箱3Dモデル、Three.jsプリミティブ), 6.6(パフォーマンス方針)
 import * as THREE from 'three';
-import type { Vec3 } from '../types';
+import type { ITreasureView, Vec3 } from '../types';
 
 const WOOD_COLOR = 0x6b4226;
 const GOLD_COLOR = 0xd4af37;
@@ -84,7 +84,7 @@ function easeOutBackJump(t: number): number {
   return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
-export class TreasureView {
+export class TreasureView implements ITreasureView {
   private readonly scene: THREE.Scene;
   private readonly group: THREE.Group;
   private readonly chest: THREE.Group;
@@ -178,6 +178,11 @@ export class TreasureView {
   showMiss(pos: Vec3): void {
     // ハズレ演出(土煙)。宝箱は表示しない。恒久的な「掘った跡」はDigMarksが別途担当する。
     this.spawnDust(pos);
+  }
+
+  /** 見つける側が発掘成功した瞬間の演出。宝箱は「地中から出てくる」点でreveal()と同一の演出でよい。 */
+  collect(pos: Vec3): void {
+    this.reveal(pos);
   }
 
   update(dtMs: number): void {

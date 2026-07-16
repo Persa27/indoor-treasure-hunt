@@ -1,5 +1,5 @@
 // 担当Phase2エージェントが実装する。対応SPEC.md: 6.2(DOM Overlay), 9章(アクセシビリティ・UI要件)
-import type { GamePhase, GameResult, GameSettings, RadarFeedback, RadarLevel } from '../types';
+import type { GameMode, GamePhase, GameResult, GameSettings, RadarFeedback, RadarLevel } from '../types';
 
 export interface UIActions {
   onStartGame(): void;
@@ -29,22 +29,58 @@ interface NumericFieldDef {
 }
 
 const NUMERIC_FIELDS: NumericFieldDef[] = [
-  { key: 'treasureCount', label: '<ruby>宝箱<rt>たからばこ</rt></ruby>の数', min: 1, max: 5, step: 1, unit: '個' },
+  { key: 'treasureCount', label: 'たからの数', min: 1, max: 5, step: 1, unit: '個' },
   { key: 'hideTimeSec', label: '<ruby>隠<rt>かく</rt></ruby>す時間', min: 15, max: 300, step: 1, unit: '秒' },
   { key: 'seekTimeSec', label: '<ruby>探<rt>さが</rt></ruby>す時間', min: 30, max: 600, step: 1, unit: '秒' },
   { key: 'successRadiusM', label: 'あたり<ruby>半径<rt>はんけい</rt></ruby>', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
-  { key: 'digCooldownSec', label: 'スコップのまち時間', min: 0, max: 10, step: 0.5, unit: '秒' },
+  { key: 'digCooldownSec', label: 'つぎまでのまち時間', min: 0, max: 10, step: 0.5, unit: '秒' },
   { key: 'radarNearM', label: 'レーダー近しきい値', min: 0.1, max: 5, step: 0.1, unit: 'm' },
   { key: 'radarMidM', label: 'レーダー中しきい値', min: 0.1, max: 10, step: 0.1, unit: 'm' },
   { key: 'radarFarM', label: 'レーダー遠しきい値', min: 0.1, max: 20, step: 0.1, unit: 'm' },
 ];
 
-const RESULT_MESSAGES: Record<GameResult, string> = {
-  'seeker-win': '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ発見！さがす人のかち！',
-  'hider-win': 'じかんぎれ！かくす人のかち！',
-  'hider-forfeit': '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、かくす人のまけ',
-  aborted: 'ARがうまく動かなかったので、引き分け',
+// あそびかた(宝箱モード/コインモード)ごとの文言・アイコンの差し替え定義
+interface ModeMeta {
+  optionIcon: string;
+  optionLabel: string;
+  hideEyebrowIcon: string;
+  hideGuide: string;
+  confirmLabel: string;
+  confirmIcon: string;
+  successMessage: string;
+  forfeitMessage: string;
+}
+
+const MODE_META: Record<GameMode, ModeMeta> = {
+  chest: {
+    optionIcon: 'chest',
+    optionLabel: '<ruby>宝箱<rt>たからばこ</rt></ruby>をほる',
+    hideEyebrowIcon: 'spade',
+    hideGuide: 'タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(さいごの1こは置きなおしOK)',
+    confirmLabel: 'ここにうめる！',
+    confirmIcon: 'chest',
+    successMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ発見！さがす人のかち！',
+    forfeitMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、かくす人のまけ',
+  },
+  coin: {
+    optionIcon: 'coin',
+    optionLabel: 'コインをあつめる',
+    hideEyebrowIcon: 'coin',
+    hideGuide: 'タップしてコインを置こう!(さいごの1こは置きなおしOK)',
+    confirmLabel: 'ここに置く！',
+    confirmIcon: 'coin',
+    successMessage: 'コインぜんぶかいしゅう！さがす人のかち！',
+    forfeitMessage: 'コインを置けなかったので、かくす人のまけ',
+  },
 };
+
+function resultMessage(result: GameResult, mode: GameMode): string {
+  const meta = MODE_META[mode];
+  if (result === 'seeker-win') return meta.successMessage;
+  if (result === 'hider-forfeit') return meta.forfeitMessage;
+  if (result === 'hider-win') return 'じかんぎれ！かくす人のかち！';
+  return 'ARがうまく動かなかったので、引き分け';
+}
 
 const RADAR_LEVELS: RadarLevel[] = ['far', 'mid', 'near', 'hot'];
 
@@ -70,12 +106,16 @@ export class OverlayUI {
   private readonly screens: Record<GamePhase, HTMLElement>;
   private readonly numericInputs: Partial<Record<NumericFieldDef['key'], HTMLInputElement>> = {};
   private readonly numericValueLabels: Partial<Record<NumericFieldDef['key'], HTMLElement>> = {};
+  private readonly gameModeInputs: Partial<Record<GameMode, HTMLInputElement>> = {};
   private soundInput!: HTMLInputElement;
   private vibrationInput!: HTMLInputElement;
 
   private startGameBtn!: HTMLButtonElement;
   private startReasonEl!: HTMLElement;
   private confirmHideBtn!: HTMLButtonElement;
+  private hideEyebrowIconEl!: HTMLElement;
+  private hideGuideEl!: HTMLElement;
+  private hideConfirmLabelEl!: HTMLElement;
   private hideProgressEl!: HTMLElement;
   private timerHideEl!: HTMLElement;
   private timerSeekEl!: HTMLElement;
@@ -174,6 +214,7 @@ export class OverlayUI {
           <li>わたすとき: 画面を消したり伏せたりしないで、さがす人にわたそう。</li>
           <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップしてほって、レーダーをたよりに宝箱を見つけよう!</li>
         </ol>
+        <p class="notice">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby>で「<ruby>宝箱<rt>たからばこ</rt></ruby>をほる」か「コインをあつめる」かをえらべるよ。</p>
         <p class="notice">つかえる機種: ARCore対応のAndroid + Chrome。iPhoneでは遊べません。</p>
         <p class="notice">カメラの映像はARの表示だけに使われ、保存や外部そうしんは一切ありません。</p>
       </div>
@@ -195,6 +236,25 @@ export class OverlayUI {
     return screen;
   }
 
+  private buildModeOption(mode: GameMode): HTMLLabelElement {
+    const meta = MODE_META[mode];
+    const label = el('label', 'mode-option');
+
+    const input = el('input');
+    input.type = 'radio';
+    input.name = 'game-mode';
+    input.value = mode;
+    label.appendChild(input);
+
+    const body = el('span', 'mode-option-body');
+    // MODE_METAはソース定数(ユーザー入力なし)のためinnerHTMLでアイコン表示を許容する
+    body.innerHTML = `${icon(meta.optionIcon)}<span>${meta.optionLabel}</span>`;
+    label.appendChild(body);
+
+    this.gameModeInputs[mode] = input;
+    return label;
+  }
+
   private buildSettings(): HTMLElement {
     const screen = el('section', 'screen screen-settings');
     const head = el('div', 'title-head title-head-compact');
@@ -203,6 +263,19 @@ export class OverlayUI {
 
     const scroll = el('div', 'settings-scroll');
     const form = el('div', 'settings-form');
+
+    const modeRow = el('div', 'field-row-mode');
+    const modeLegend = el('p', 'field-mode-legend');
+    modeLegend.innerHTML = `${icon('map')} あそびかたをえらぼう`;
+    modeRow.appendChild(modeLegend);
+
+    const modeOptions = el('div', 'mode-options');
+    (Object.keys(MODE_META) as GameMode[]).forEach((mode) => {
+      modeOptions.appendChild(this.buildModeOption(mode));
+    });
+    modeRow.appendChild(modeOptions);
+    form.appendChild(modeRow);
+
     for (const field of NUMERIC_FIELDS) {
       const row = el('div', 'field-row');
       const label = el('label');
@@ -273,22 +346,35 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-hide');
     screen.innerHTML = `
       <div class="hud-corner hud-tl">
-        <p class="eyebrow">${icon('spade')} <ruby>隠<rt>かく</rt></ruby>す番</p>
+        <p class="eyebrow"><span data-role="hide-eyebrow-icon"></span> <ruby>隠<rt>かく</rt></ruby>す番</p>
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="hide-progress"></div>
       </div>
-      <div class="guide-pad">タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(さいごの1こは置きなおしOK)</div>
+      <div class="guide-pad" data-role="hide-guide"></div>
       <div class="bottom-bar">
         <div class="button-row">
-          <button type="button" class="btn btn-primary btn-large" data-action="confirm-hide" disabled>ここにうめる！${icon('chest')}</button>
+          <button type="button" class="btn btn-primary btn-large" data-action="confirm-hide" disabled>
+            <span data-role="hide-confirm-label"></span>
+          </button>
         </div>
       </div>
     `;
     this.timerHideEl = screen.querySelector('[data-role="timer"]') as HTMLElement;
+    this.hideEyebrowIconEl = screen.querySelector('[data-role="hide-eyebrow-icon"]') as HTMLElement;
+    this.hideGuideEl = screen.querySelector('[data-role="hide-guide"]') as HTMLElement;
+    this.hideConfirmLabelEl = screen.querySelector('[data-role="hide-confirm-label"]') as HTMLElement;
     this.hideProgressEl = screen.querySelector('[data-role="hide-progress"]') as HTMLElement;
     this.confirmHideBtn = screen.querySelector('[data-action="confirm-hide"]') as HTMLButtonElement;
     this.confirmHideBtn.addEventListener('click', () => this.actions.onConfirmHide());
     return screen;
+  }
+
+  private applyHideScreenMode(mode: GameMode): void {
+    const meta = MODE_META[mode];
+    // MODE_METAはソース定数(ユーザー入力なし)のためinnerHTMLでアイコン表示を許容する
+    this.hideEyebrowIconEl.innerHTML = icon(meta.hideEyebrowIcon);
+    this.hideGuideEl.innerHTML = meta.hideGuide;
+    this.hideConfirmLabelEl.innerHTML = `${meta.confirmLabel}${icon(meta.confirmIcon)}`;
   }
 
   private buildHandover(): HTMLElement {
@@ -390,9 +476,12 @@ export class OverlayUI {
     if (phase === 'settings' && this.settings) {
       this.applySettingsToForm(this.settings);
     }
+    if (phase === 'hide') {
+      this.applyHideScreenMode(this.settings?.gameMode ?? 'chest');
+    }
     if (phase === 'result' && ctx?.result) {
-      // RESULT_MESSAGESは固定の定数テーブル(ユーザー入力なし)のためinnerHTMLでルビ表示を許容する
-      this.resultMessageEl.innerHTML = RESULT_MESSAGES[ctx.result];
+      // resultMessage()は固定文言テーブルを参照するのみ(ユーザー入力なし)のためinnerHTMLでルビ表示を許容する
+      this.resultMessageEl.innerHTML = resultMessage(ctx.result, this.settings?.gameMode ?? 'chest');
     }
     if (phase === 'error') {
       this.errorMsgEl.textContent = ctx?.errorMsg ?? '不明なエラーが発生しました。';
@@ -527,6 +616,10 @@ export class OverlayUI {
   }
 
   private applySettingsToForm(s: GameSettings): void {
+    for (const mode of Object.keys(this.gameModeInputs) as GameMode[]) {
+      const input = this.gameModeInputs[mode];
+      if (input) input.checked = mode === s.gameMode;
+    }
     for (const field of NUMERIC_FIELDS) {
       const input = this.numericInputs[field.key];
       const label = this.numericValueLabels[field.key];
@@ -541,6 +634,12 @@ export class OverlayUI {
 
   private readSettingsFromForm(base: GameSettings): GameSettings {
     const next: GameSettings = { ...base };
+    const checkedMode = (Object.keys(this.gameModeInputs) as GameMode[]).find(
+      (mode) => this.gameModeInputs[mode]?.checked,
+    );
+    if (checkedMode) {
+      next.gameMode = checkedMode;
+    }
     for (const field of NUMERIC_FIELDS) {
       const input = this.numericInputs[field.key];
       if (!input) continue;

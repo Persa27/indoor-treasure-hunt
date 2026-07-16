@@ -1,10 +1,12 @@
 // 担当Phase2エージェントが実装する。対応SPEC.md: 4(設定項目), 8.4(localStorageの検証)
-import { DEFAULT_SETTINGS, type GameSettings } from './types';
+import { DEFAULT_SETTINGS, type GameMode, type GameSettings } from './types';
 
 const STORAGE_KEY = 'indoor-treasure-hunt:settings';
 
+const GAME_MODES: GameMode[] = ['chest', 'coin'];
+
 const RANGES: Record<
-  Exclude<keyof GameSettings, 'soundEnabled' | 'vibrationEnabled'>,
+  Exclude<keyof GameSettings, 'soundEnabled' | 'vibrationEnabled' | 'gameMode'>,
   { min: number; max: number }
 > = {
   treasureCount: { min: 1, max: 5 },
@@ -34,6 +36,9 @@ export function loadSettings(): GameSettings {
       if (isValidNumber(value, range.min, range.max)) {
         (result[key] as number) = key === 'treasureCount' ? Math.round(value) : value;
       }
+    }
+    if (typeof parsed.gameMode === 'string' && (GAME_MODES as string[]).includes(parsed.gameMode)) {
+      result.gameMode = parsed.gameMode as GameMode;
     }
     if (typeof parsed.soundEnabled === 'boolean') {
       result.soundEnabled = parsed.soundEnabled;
