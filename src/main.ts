@@ -41,10 +41,15 @@ beeper.setEnabled(settings.soundEnabled);
 
 const timer = new TurnTimer();
 
+interface TreasureSlot {
+  anchor: TreasureAnchor;
+  view: TreasureView;
+  found: boolean;
+}
+
 // ゲーム進行中に生成/破棄されるAR依存オブジェクト
 let session: ARSession | null = null;
-let anchor: TreasureAnchor | null = null;
-let treasureView: TreasureView | null = null;
+let treasures: TreasureSlot[] = [];
 let digMarks: DigMarks | null = null;
 let judge: DigJudge | null = null;
 
@@ -77,7 +82,7 @@ const actions: UIActions = {
   },
   onConfirmHide: () => {
     if (state.getPhase() !== 'hide') return;
-    if (!anchor?.getPosition()) return;
+    if (treasures.length === 0) return;
     finishHideTurn(true);
   },
   onStartSeek: () => {
@@ -122,19 +127,40 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
   const dt = lastFrameTimeMs === null ? 0 : now - lastFrameTimeMs;
   lastFrameTimeMs = now;
 
-  anchor?.updateFromFrame(frame, refSpace);
-  treasureView?.update(dt);
+  for (const t of treasures) {
+    t.anchor.updateFromFrame(frame, refSpace);
+    t.view.update(dt);
+  }
 
   // レーダーは探索ターン中は常時起動(SPEC 3.5)。ターン終了時はstopSeekLoopsで必ず停止する。
   if (state.getPhase() === 'seek' && viewerPos) {
-    const treasurePos = anchor?.getPosition();
-    if (treasurePos) {
-      const fb = computeRadar(viewerPos, treasurePos, settings);
+    const nearest = nearestRemainingTreasurePos(viewerPos);
+    if (nearest) {
+      const fb = computeRadar(viewerPos, nearest, settings);
       overlay.setRadarGlow(fb);
       beeper.updateRadar(fb);
     }
   }
 };
+
+function nearestRemainingTreasurePos(from: Vec3): Vec3 | null {
+  let best: Vec3 | null = null;
+  let bestDistSq = Infinity;
+  for (const t of treasures) {
+    if (t.found) continue;
+    const pos = t.anchor.getPosition();
+    if (!pos) continue;
+    const dx = pos.x - from.x;
+    const dy = pos.y - from.y;
+    const dz = pos.z - from.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+    if (distSq < bestDistSq) {
+      bestDistSq = distSq;
+      best = pos;
+    }
+  }
+  return best;
+}
 
 // ---------------------------------------------------------------------
 // ゲーム開始
@@ -152,13 +178,13 @@ async function startGame(): Promise<void> {
   }
 
   session = newSession;
-  treasureView = new TreasureView(session.getScene());
+  treasures = [];
   digMarks = new DigMarks(session.getScene());
-  anchor = new TreasureAnchor();
   lastFrameTimeMs = null;
   session.setFrameHook(frameHook);
   session.setSelectEnabled(true);
   overlay.setConfirmEnabled(false);
+  overlay.updateHideProgress(0, settings.treasureCount);
 
   timer.start(settings.hideTimeSec, (remain) => overlay.updateTimer(remain), onHideTimeExpire);
   state.startGame();
@@ -175,23 +201,37 @@ function handleSelect(hit: Vec3 | null): void {
       overlay.toast('平面を検出できません。少し端末を動かしてください');
       return;
     }
-    void anchor?.place(hit, session?.getLastHitResult() ?? undefined);
-    treasureView?.showAt(hit);
-    overlay.setConfirmEnabled(true);
+    const hitResult = session?.getLastHitResult() ?? undefined;
+    if (treasures.length < settings.treasureCount) {
+      const slot: TreasureSlot = {
+        anchor: new TreasureAnchor(),
+        view: new TreasureView(session!.getScene()),
+        found: false,
+      };
+      void slot.anchor.place(hit, hitResult);
+      slot.view.showAt(hit);
+      treasures.push(slot);
+    } else {
+      const last = treasures[treasures.length - 1];
+      void last.anchor.place(hit, hitResult);
+      last.view.showAt(hit);
+    }
+    overlay.updateHideProgress(treasures.length, settings.treasureCount);
+    overlay.setConfirmEnabled(treasures.length >= settings.treasureCount);
   } else if (phase === 'seek') {
     handleSeekSelect(hit);
   }
 }
 
 function onHideTimeExpire(): void {
-  finishHideTurn(anchor?.getPosition() != null);
+  finishHideTurn(treasures.length > 0);
 }
 
 function finishHideTurn(placed: boolean): void {
   timer.stop();
   session?.setSelectEnabled(false);
   if (placed) {
-    treasureView?.hide();
+    for (const t of treasures) t.view.hide();
     state.confirmHide(true);
   } else {
     state.confirmHide(false);
@@ -208,14 +248,25 @@ function handleSeekSelect(hit: Vec3 | null): void {
     overlay.toast('平面を検出できません。少し端末を動かしてください');
     return;
   }
-  const treasurePos = anchor?.getPosition();
-  if (!treasurePos) return;
 
-  const result = judge.judge(hit, treasurePos);
-  if (result.hit) {
-    handleSeekSuccess(treasurePos);
+  let bestSlot: TreasureSlot | null = null;
+  let bestDist = Infinity;
+  for (const t of treasures) {
+    if (t.found) continue;
+    const pos = t.anchor.getPosition();
+    if (!pos) continue;
+    const result = judge.judge(hit, pos);
+    if (result.hit && result.distanceM < bestDist) {
+      bestDist = result.distanceM;
+      bestSlot = t;
+    }
+  }
+
+  if (bestSlot) {
+    handleSeekSuccess(bestSlot);
   } else {
-    treasureView?.showMiss(hit);
+    // showMissは位置にダストを出すだけの演出でどのTreasureViewでも等価に使える
+    treasures[0].view.showMiss(hit);
     digMarks?.addDigMark(hit);
     beeper.playMiss();
     judge.startCooldown();
@@ -230,11 +281,21 @@ function stopSeekLoops(): void {
   beeper.stopRadar();
 }
 
-function handleSeekSuccess(treasurePos: Vec3): void {
-  stopSeekLoops();
-  treasureView?.reveal(treasurePos);
+function handleSeekSuccess(slot: TreasureSlot): void {
+  slot.found = true;
+  const pos = slot.anchor.getPosition();
+  if (pos) slot.view.reveal(pos);
   beeper.playPop();
   setTimeout(() => beeper.playSuccess(), 250);
+
+  const remaining = treasures.some((t) => !t.found);
+  if (remaining) {
+    // まだ未発見の宝箱が残っているため探索を継続する
+    judge?.startCooldown();
+    return;
+  }
+
+  stopSeekLoops();
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
     state.finishSeek('seeker-win');
@@ -243,11 +304,12 @@ function handleSeekSuccess(treasurePos: Vec3): void {
 
 function onSeekTimeExpire(): void {
   stopSeekLoops();
-  const pos = anchor?.getPosition();
-  if (pos) {
-    treasureView?.reveal(pos);
-    beeper.playPop();
+  for (const t of treasures) {
+    if (t.found) continue;
+    const pos = t.anchor.getPosition();
+    if (pos) t.view.reveal(pos);
   }
+  beeper.playPop();
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
     state.finishSeek('hider-win');
@@ -300,8 +362,7 @@ function resetMatchState(): void {
   beeper.stopRadar();
 
   session = null;
-  anchor = null;
-  treasureView = null;
+  treasures = [];
   digMarks = null;
   judge = null;
   viewerPos = null;

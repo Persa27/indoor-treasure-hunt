@@ -12,7 +12,15 @@ export interface UIActions {
 
 // 設定フォームの各数値項目のUI定義(min/max/stepはSPEC.mdセクション4に準拠。静的定数のみでinnerHTMLに埋め込む)
 interface NumericFieldDef {
-  key: 'hideTimeSec' | 'seekTimeSec' | 'successRadiusM' | 'digCooldownSec' | 'radarNearM' | 'radarMidM' | 'radarFarM';
+  key:
+    | 'treasureCount'
+    | 'hideTimeSec'
+    | 'seekTimeSec'
+    | 'successRadiusM'
+    | 'digCooldownSec'
+    | 'radarNearM'
+    | 'radarMidM'
+    | 'radarFarM';
   label: string;
   min: number;
   max: number;
@@ -21,6 +29,7 @@ interface NumericFieldDef {
 }
 
 const NUMERIC_FIELDS: NumericFieldDef[] = [
+  { key: 'treasureCount', label: '宝箱の数', min: 1, max: 5, step: 1, unit: '個' },
   { key: 'hideTimeSec', label: '隠す時間', min: 15, max: 300, step: 1, unit: '秒' },
   { key: 'seekTimeSec', label: '探す時間', min: 30, max: 600, step: 1, unit: '秒' },
   { key: 'successRadiusM', label: '成功半径', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
@@ -62,6 +71,7 @@ export class OverlayUI {
   private startGameBtn!: HTMLButtonElement;
   private startReasonEl!: HTMLElement;
   private confirmHideBtn!: HTMLButtonElement;
+  private hideProgressEl!: HTMLElement;
   private timerHideEl!: HTMLElement;
   private timerSeekEl!: HTMLElement;
   private cooldownRing!: SVGCircleElement;
@@ -243,8 +253,9 @@ export class OverlayUI {
       <div class="hud-corner hud-tl">
         <p class="eyebrow">HIDER'S TURN</p>
         <div class="timer-pad" data-role="timer"></div>
+        <div class="timer-pad" data-role="hide-progress"></div>
       </div>
-      <div class="guide-pad">タップで宝箱を置く(置き直し可)</div>
+      <div class="guide-pad">タップで宝箱を置く(最後の1個は置き直し可)</div>
       <div class="bottom-bar">
         <div class="button-row">
           <button type="button" class="btn btn-primary btn-large" data-action="confirm-hide" disabled>ここに隠す(確定)</button>
@@ -252,6 +263,7 @@ export class OverlayUI {
       </div>
     `;
     this.timerHideEl = screen.querySelector('[data-role="timer"]') as HTMLElement;
+    this.hideProgressEl = screen.querySelector('[data-role="hide-progress"]') as HTMLElement;
     this.confirmHideBtn = screen.querySelector('[data-action="confirm-hide"]') as HTMLButtonElement;
     this.confirmHideBtn.addEventListener('click', () => this.actions.onConfirmHide());
     return screen;
@@ -435,6 +447,10 @@ export class OverlayUI {
 
   setConfirmEnabled(enabled: boolean): void {
     this.confirmHideBtn.disabled = !enabled;
+  }
+
+  updateHideProgress(placed: number, total: number): void {
+    this.hideProgressEl.textContent = total > 1 ? `配置: ${placed} / ${total}` : '';
   }
 
   toast(msg: string): void {

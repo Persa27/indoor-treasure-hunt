@@ -12,6 +12,7 @@ export type GamePhase =
   | 'error';
 
 export interface GameSettings {
+  treasureCount: number; // default 1, range 1-5
   hideTimeSec: number; // default 60, range 15-300
   seekTimeSec: number; // default 180, range 30-600
   successRadiusM: number; // default 0.5, range 0.2-1.5
@@ -24,6 +25,7 @@ export interface GameSettings {
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
+  treasureCount: 1,
   hideTimeSec: 60,
   seekTimeSec: 180,
   successRadiusM: 0.5,

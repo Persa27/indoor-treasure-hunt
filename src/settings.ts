@@ -7,6 +7,7 @@ const RANGES: Record<
   Exclude<keyof GameSettings, 'soundEnabled' | 'vibrationEnabled'>,
   { min: number; max: number }
 > = {
+  treasureCount: { min: 1, max: 5 },
   hideTimeSec: { min: 15, max: 300 },
   seekTimeSec: { min: 30, max: 600 },
   successRadiusM: { min: 0.2, max: 1.5 },
@@ -31,7 +32,7 @@ export function loadSettings(): GameSettings {
       const range = RANGES[key];
       const value = parsed[key];
       if (isValidNumber(value, range.min, range.max)) {
-        (result[key] as number) = value;
+        (result[key] as number) = key === 'treasureCount' ? Math.round(value) : value;
       }
     }
     if (typeof parsed.soundEnabled === 'boolean') {
