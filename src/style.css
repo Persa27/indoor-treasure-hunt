@@ -351,7 +351,7 @@ li {
 }
 
 /* -------------------------------------------------------------------------
-   探すターン: レーダーボタン・グロー・クールダウン
+   探すターン: レーダーグロー(常時起動)・スコップのインターバル表示
    ------------------------------------------------------------------------- */
 
 .screen-seek {
@@ -361,27 +361,6 @@ li {
 .screen-seek .hud-tl {
   padding: max(12px, env(safe-area-inset-top)) 0 0 12px;
   position: absolute;
-}
-
-.radar-btn {
-  position: absolute;
-  right: max(20px, env(safe-area-inset-right));
-  bottom: max(24px, env(safe-area-inset-bottom));
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: var(--ink-panel-strong);
-  border: 2px solid var(--brass);
-  z-index: 6;
-}
-
-.radar-btn::before {
-  content: '';
-  position: absolute;
-  inset: 18px;
-  border: 2px solid var(--brass);
-  border-radius: 50%;
-  opacity: 0.6;
 }
 
 .cooldown-wrap {

@@ -2,6 +2,7 @@
 import { ARSession, type ARSessionCallbacks, type ARFrameHook } from './ar/session';
 import { TreasureAnchor } from './ar/anchor';
 import { TreasureView } from './scene/treasure';
+import { DigMarks } from './scene/digMarks';
 import { GameStateMachine, type StateChangeCtx } from './game/state';
 import { TurnTimer } from './game/timer';
 import { DigJudge } from './game/judge';
@@ -44,10 +45,10 @@ const timer = new TurnTimer();
 let session: ARSession | null = null;
 let anchor: TreasureAnchor | null = null;
 let treasureView: TreasureView | null = null;
+let digMarks: DigMarks | null = null;
 let judge: DigJudge | null = null;
 
 let viewerPos: Vec3 | null = null;
-let radarPressed = false;
 let lastFrameTimeMs: number | null = null;
 
 let cooldownIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -87,15 +88,6 @@ const actions: UIActions = {
     startCooldownPolling();
     state.startSeek();
   },
-  onRadarPress: () => {
-    if (state.getPhase() !== 'seek') return;
-    radarPressed = true;
-  },
-  onRadarRelease: () => {
-    radarPressed = false;
-    overlay.setRadarGlow(null);
-    beeper.stopRadar();
-  },
   onRetry: () => {
     handleRetry();
   },
@@ -133,7 +125,8 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
   anchor?.updateFromFrame(frame, refSpace);
   treasureView?.update(dt);
 
-  if (radarPressed && state.getPhase() === 'seek' && viewerPos) {
+  // レーダーは探索ターン中は常時起動(SPEC 3.5)。ターン終了時はstopSeekLoopsで必ず停止する。
+  if (state.getPhase() === 'seek' && viewerPos) {
     const treasurePos = anchor?.getPosition();
     if (treasurePos) {
       const fb = computeRadar(viewerPos, treasurePos, settings);
@@ -160,6 +153,7 @@ async function startGame(): Promise<void> {
 
   session = newSession;
   treasureView = new TreasureView(session.getScene());
+  digMarks = new DigMarks(session.getScene());
   anchor = new TreasureAnchor();
   lastFrameTimeMs = null;
   session.setFrameHook(frameHook);
@@ -222,6 +216,7 @@ function handleSeekSelect(hit: Vec3 | null): void {
     handleSeekSuccess(treasurePos);
   } else {
     treasureView?.showMiss(hit);
+    digMarks?.addDigMark(hit);
     beeper.playMiss();
     judge.startCooldown();
   }
@@ -231,7 +226,6 @@ function stopSeekLoops(): void {
   timer.stop();
   session?.setSelectEnabled(false);
   stopCooldownPolling();
-  radarPressed = false;
   overlay.setRadarGlow(null);
   beeper.stopRadar();
 }
@@ -239,7 +233,8 @@ function stopSeekLoops(): void {
 function handleSeekSuccess(treasurePos: Vec3): void {
   stopSeekLoops();
   treasureView?.reveal(treasurePos);
-  beeper.playSuccess();
+  beeper.playPop();
+  setTimeout(() => beeper.playSuccess(), 250);
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
     state.finishSeek('seeker-win');
@@ -251,6 +246,7 @@ function onSeekTimeExpire(): void {
   const pos = anchor?.getPosition();
   if (pos) {
     treasureView?.reveal(pos);
+    beeper.playPop();
   }
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
@@ -300,13 +296,13 @@ function resetMatchState(): void {
     clearTimeout(resultTimeoutId);
     resultTimeoutId = null;
   }
-  radarPressed = false;
   overlay.setRadarGlow(null);
   beeper.stopRadar();
 
   session = null;
   anchor = null;
   treasureView = null;
+  digMarks = null;
   judge = null;
   viewerPos = null;
   lastFrameTimeMs = null;

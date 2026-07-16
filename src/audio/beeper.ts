@@ -131,9 +131,55 @@ export class Beeper {
     });
   }
 
-  /** 低い短いブザー。 */
+  /** スコップで掘る「ザクッ」という低い短いブザー。 */
   playMiss(): void {
     if (!this.enabled) return;
-    this.playTone(140, 0.22, 0.3, 'sawtooth');
+    const ctx = this.ensureContext();
+    if (!ctx || ctx.state === 'suspended') return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.exponentialRampToValueAtTime(70, now + 0.16);
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.28, now + 0.01);
+    gain.gain.linearRampToValueAtTime(0, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.22);
+    osc.addEventListener('ended', () => {
+      osc.disconnect();
+      gain.disconnect();
+    });
+  }
+
+  /** 宝箱が地中から飛び出す「ポンッ」という短い音(周波数が急上昇するsine)。 */
+  playPop(): void {
+    if (!this.enabled) return;
+    const ctx = this.ensureContext();
+    if (!ctx || ctx.state === 'suspended') return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.exponentialRampToValueAtTime(900, now + 0.12);
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.32, now + 0.015);
+    gain.gain.linearRampToValueAtTime(0, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.18);
+    osc.addEventListener('ended', () => {
+      osc.disconnect();
+      gain.disconnect();
+    });
   }
 }

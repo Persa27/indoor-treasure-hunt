@@ -1,9 +1,10 @@
-// 担当Phase2エージェントが実装する。対応SPEC.md: 6.5(宝箱3Dモデル、Three.jsプリミティブ), 6.6(パフォーマンス方針)
+// 担当Phase2エージェントが実装する。対応SPEC.md: 3.2, 3.4(埋める/掘り出す演出), 6.5(宝箱3Dモデル、Three.jsプリミティブ), 6.6(パフォーマンス方針)
 import * as THREE from 'three';
 import type { Vec3 } from '../types';
 
 const WOOD_COLOR = 0x6b4226;
 const GOLD_COLOR = 0xd4af37;
+const DIRT_COLOR = 0x5a3d22;
 
 type ParticleKind = 'sparkle' | 'dust';
 
@@ -17,7 +18,7 @@ interface ParticleBurst {
   lifeMs: number;
 }
 
-function buildChest(): { group: THREE.Group; lid: THREE.Group } {
+function buildChest(): { group: THREE.Group; lid: THREE.Group; materials: THREE.MeshStandardMaterial[] } {
   const group = new THREE.Group();
 
   const woodMat = new THREE.MeshStandardMaterial({ color: WOOD_COLOR, roughness: 0.8, metalness: 0.1 });
@@ -63,7 +64,24 @@ function buildChest(): { group: THREE.Group; lid: THREE.Group } {
   lock.position.set(0, bodyHeight - 0.01, bodyDepth / 2 + 0.01);
   group.add(lock);
 
-  return { group, lid };
+  return { group, lid, materials: [woodMat, goldMat] };
+}
+
+function buildMound(): THREE.Mesh {
+  // 土盛りマーク: 茶色の低い円錐
+  const geometry = new THREE.ConeGeometry(0.17, 0.07, 16);
+  const material = new THREE.MeshStandardMaterial({ color: DIRT_COLOR, roughness: 1, metalness: 0 });
+  const mound = new THREE.Mesh(geometry, material);
+  mound.position.y = 0.035;
+  return mound;
+}
+
+// 着地バウンド付きのジャンプイージング(easeOutBack)。1を少し超えてから1へ収束する。
+function easeOutBackJump(t: number): number {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  const x = Math.min(1, Math.max(0, t));
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
 }
 
 export class TreasureView {
@@ -71,13 +89,22 @@ export class TreasureView {
   private readonly group: THREE.Group;
   private readonly chest: THREE.Group;
   private readonly lid: THREE.Group;
+  private readonly chestMaterials: THREE.MeshStandardMaterial[];
+  private readonly mound: THREE.Mesh;
 
-  private floatAgeMs = 0;
-  private floating = false;
+  private idleAgeMs = 0;
+  private idleFloating = false;
 
   private lidOpen = false;
   private lidAngle = 0;
   private readonly lidOpenAngle = -Math.PI * 0.62;
+
+  // 発掘演出(地中からポンッと飛び出す)用の状態
+  private popping = false;
+  private popAgeMs = 0;
+  private readonly popDurationMs = 480;
+  private popLanded = false;
+  private popTargetPos: Vec3 | null = null;
 
   private readonly bursts: ParticleBurst[] = [];
 
@@ -87,50 +114,80 @@ export class TreasureView {
     this.group.visible = false;
     this.scene.add(this.group);
 
-    const { group: chest, lid } = buildChest();
+    const { group: chest, lid, materials } = buildChest();
     this.chest = chest;
     this.lid = lid;
+    this.chestMaterials = materials;
     this.group.add(chest);
+
+    this.mound = buildMound();
+    this.mound.visible = false;
+    this.group.add(this.mound);
   }
 
+  /**
+   * 隠すターンのプレビュー: 土盛りマーク+半透明の宝箱を表示する。呼ぶたび移動。
+   */
   showAt(pos: Vec3): void {
-    // 配置プレビュー表示(隠すターン)。呼ぶたび移動。
+    this.popping = false;
     this.group.position.set(pos.x, pos.y, pos.z);
     this.group.visible = true;
+
+    this.mound.visible = true;
+    this.setChestOpacity(0.5);
     this.chest.visible = true;
+    this.chest.position.y = -0.03; // 土に少し沈んだ見え方にする
     this.setLidOpen(false, true);
-    this.floating = true;
-    this.floatAgeMs = 0;
+
+    this.idleFloating = true;
+    this.idleAgeMs = 0;
   }
 
+  /**
+   * 確定後(手渡し以降): すべて非表示(埋まった状態)。
+   */
   hide(): void {
-    // 非表示(手渡し以降)
     this.group.visible = false;
-    this.floating = false;
+    this.mound.visible = false;
+    this.idleFloating = false;
+    this.popping = false;
   }
 
+  /**
+   * 発掘成功/ネタバラシ演出: 地中から宝箱がポンッと飛び出す(跳ね上がり+着地で小バウンド)。
+   * 着地後に蓋が開き、金色パーティクルを発生させる。
+   */
   reveal(pos: Vec3): void {
-    // 発掘成功/ネタバラシ演出(蓋が開く+パーティクル)
+    this.idleFloating = false;
+    this.mound.visible = false;
+    this.setChestOpacity(1);
+
     this.group.position.set(pos.x, pos.y, pos.z);
     this.group.visible = true;
     this.chest.visible = true;
-    this.floating = false;
-    this.chest.position.y = 0;
-    this.setLidOpen(true, false);
-    this.spawnSparkles(pos);
+    this.chest.position.y = -0.3;
+    this.setLidOpen(false, true);
+
+    this.popping = true;
+    this.popAgeMs = 0;
+    this.popLanded = false;
+    this.popTargetPos = pos;
   }
 
   showMiss(pos: Vec3): void {
-    // ハズレ演出(土煙)。宝箱は表示しない。
+    // ハズレ演出(土煙)。宝箱は表示しない。恒久的な「掘った跡」はDigMarksが別途担当する。
     this.spawnDust(pos);
   }
 
   update(dtMs: number): void {
-    // アニメーション更新
-    if (this.floating) {
-      this.floatAgeMs += dtMs;
-      const t = this.floatAgeMs / 1000;
-      this.chest.position.y = Math.sin(t * 1.6) * 0.02;
+    if (this.idleFloating) {
+      this.idleAgeMs += dtMs;
+      const t = this.idleAgeMs / 1000;
+      this.chest.position.y = -0.03 + Math.sin(t * 1.6) * 0.01;
+    }
+
+    if (this.popping) {
+      this.updatePop(dtMs);
     }
 
     if (this.lidOpen && this.lidAngle > this.lidOpenAngle) {
@@ -142,11 +199,37 @@ export class TreasureView {
     this.updateBursts(dtMs);
   }
 
+  private updatePop(dtMs: number): void {
+    this.popAgeMs += dtMs;
+    const t = this.popAgeMs / this.popDurationMs;
+    if (t >= 1) {
+      this.chest.position.y = 0;
+      this.popping = false;
+      if (!this.popLanded && this.popTargetPos) {
+        this.popLanded = true;
+        this.setLidOpen(true, false);
+        this.spawnSparkles(this.popTargetPos);
+      }
+      return;
+    }
+    // -0.3 -> 0 をeaseOutBackで補間(1を少し超えるオーバーシュートが「小バウンド」になる)
+    const startY = -0.3;
+    this.chest.position.y = startY + (0 - startY) * easeOutBackJump(t);
+  }
+
   private setLidOpen(open: boolean, instantClose: boolean): void {
     this.lidOpen = open;
     if (!open && instantClose) {
       this.lidAngle = 0;
       this.lid.rotation.x = 0;
+    }
+  }
+
+  private setChestOpacity(opacity: number): void {
+    for (const mat of this.chestMaterials) {
+      mat.transparent = opacity < 1;
+      mat.opacity = opacity;
+      mat.depthWrite = opacity >= 1;
     }
   }
 

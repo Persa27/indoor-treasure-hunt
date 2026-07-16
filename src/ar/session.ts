@@ -24,7 +24,11 @@ export class ARSession {
   private refSpace: XRReferenceSpace | null = null;
   private viewerSpace: XRReferenceSpace | null = null;
   private hitTestSource: XRHitTestSource | null = null;
-  private lastHitResult: XRHitTestResult | null = null;
+  private transientHitTestSource: XRTransientInputHitTestSource | null = null;
+  /** viewer空間(画面中央)常設ソースの直近結果。transient-inputが使えない場合のフォールバックにのみ使う。 */
+  private lastViewerHitResult: XRHitTestResult | null = null;
+  /** 直近のselectで採用されたXRHitTestResult(アンカー作成用)。 */
+  private lastAcceptedHitResult: XRHitTestResult | null = null;
   private frameHook: ARFrameHook | null = null;
   private wakeLock: WakeLockSentinel | null = null;
   private trackingDegraded = false;
@@ -80,8 +84,18 @@ export class ARSession {
     this.refSpace = renderer.xr.getReferenceSpace();
     this.viewerSpace = await session.requestReferenceSpace('viewer');
 
-    // Android Chromeで確実に動作する、viewer空間に固定した常設hit-test sourceを使う方式。
-    // (transient-inputハイテストはブラウザ依存が強いため避ける)
+    // タップ位置(タップ光線)で判定するため、transient-inputの常設hit-testソースを優先する(SPEC 6.2)。
+    if (typeof session.requestHitTestSourceForTransientInput === 'function') {
+      try {
+        this.transientHitTestSource =
+          (await session.requestHitTestSourceForTransientInput({ profile: 'generic-touchscreen' })) ?? null;
+      } catch {
+        this.transientHitTestSource = null;
+      }
+    }
+
+    // フォールバック: viewer空間(画面中央)に固定した常設hit-test source。
+    // transient-inputが利用できない端末/ブラウザではこちらの直近結果を使う。
     if (typeof session.requestHitTestSource === 'function' && this.viewerSpace) {
       try {
         this.hitTestSource = (await session.requestHitTestSource({ space: this.viewerSpace })) ?? null;
@@ -118,9 +132,9 @@ export class ARSession {
     this.frameHook = fn;
   }
 
-  /** アンカー作成用に直近のhit-test結果を取得する */
+  /** アンカー作成用に、直近のselectで採用されたhit-test結果を取得する */
   getLastHitResult(): XRHitTestResult | null {
-    return this.lastHitResult;
+    return this.lastAcceptedHitResult;
   }
 
   private onXRFrame = (_time: number, frame?: XRFrame): void => {
@@ -141,9 +155,9 @@ export class ARSession {
 
     if (this.hitTestSource) {
       const results = frame.getHitTestResults(this.hitTestSource);
-      this.lastHitResult = results.length > 0 ? results[0] : null;
+      this.lastViewerHitResult = results.length > 0 ? results[0] : null;
     } else {
-      this.lastHitResult = null;
+      this.lastViewerHitResult = null;
     }
 
     this.renderer.render(this.scene, this.camera);
@@ -155,15 +169,18 @@ export class ARSession {
     this.callbacks.onTrackingChange(degraded);
   }
 
-  private onSelect = (): void => {
+  private onSelect = (event: XRInputSourceEvent): void => {
     if (!this.selectEnabled) return;
 
-    if (!this.lastHitResult || !this.refSpace) {
+    const hitResult = this.resolveSelectHitResult(event);
+    this.lastAcceptedHitResult = hitResult;
+
+    if (!hitResult || !this.refSpace) {
       this.callbacks.onSelect(null);
       return;
     }
 
-    const pose = this.lastHitResult.getPose(this.refSpace);
+    const pose = hitResult.getPose(this.refSpace);
     if (!pose) {
       this.callbacks.onSelect(null);
       return;
@@ -173,12 +190,41 @@ export class ARSession {
     this.callbacks.onSelect({ x: p.x, y: p.y, z: p.z });
   };
 
+  /**
+   * タップ位置(タップ光線)のhit-test結果を解決する。
+   * transient-inputの結果からevent.inputSourceに一致するものを優先し、
+   * 取得できない場合のみviewer空間(画面中央)常設ソースの直近結果にフォールバックする。
+   */
+  private resolveSelectHitResult(event: XRInputSourceEvent): XRHitTestResult | null {
+    const frame = event.frame;
+    if (this.transientHitTestSource && frame) {
+      const transientResults = frame.getHitTestResultsForTransientInput(this.transientHitTestSource);
+      const match = transientResults.find((r) => r.inputSource === event.inputSource);
+      if (match && match.results.length > 0) {
+        return match.results[0];
+      }
+      // transientソースはあるが、このタップに対応する結果が得られなかった場合は
+      // 「面を検出できなかった」として扱う(画面中央フォールバックは使わない)。
+      if (match) {
+        return null;
+      }
+    }
+    // transientHitTestSourceの作成自体に失敗している場合のみ、画面中央の直近結果にフォールバックする。
+    if (!this.transientHitTestSource) {
+      return this.lastViewerHitResult;
+    }
+    return null;
+  }
+
   private onSessionEnd = (): void => {
     this.renderer?.setAnimationLoop(null);
 
     this.hitTestSource?.cancel();
     this.hitTestSource = null;
-    this.lastHitResult = null;
+    this.transientHitTestSource?.cancel();
+    this.transientHitTestSource = null;
+    this.lastViewerHitResult = null;
+    this.lastAcceptedHitResult = null;
     this.refSpace = null;
     this.viewerSpace = null;
 

@@ -7,8 +7,6 @@ export interface UIActions {
   onCloseSettings(s: GameSettings): void;
   onConfirmHide(): void;
   onStartSeek(): void;
-  onRadarPress(): void;
-  onRadarRelease(): void;
   onRetry(): void;
 }
 
@@ -26,7 +24,7 @@ const NUMERIC_FIELDS: NumericFieldDef[] = [
   { key: 'hideTimeSec', label: '隠す時間', min: 15, max: 300, step: 1, unit: '秒' },
   { key: 'seekTimeSec', label: '探す時間', min: 30, max: 600, step: 1, unit: '秒' },
   { key: 'successRadiusM', label: '成功半径', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
-  { key: 'digCooldownSec', label: '発掘クールダウン', min: 0, max: 10, step: 0.5, unit: '秒' },
+  { key: 'digCooldownSec', label: 'スコップのインターバル', min: 0, max: 10, step: 0.5, unit: '秒' },
   { key: 'radarNearM', label: 'レーダー近しきい値', min: 0.1, max: 5, step: 0.1, unit: 'm' },
   { key: 'radarMidM', label: 'レーダー中しきい値', min: 0.1, max: 10, step: 0.1, unit: 'm' },
   { key: 'radarFarM', label: 'レーダー遠しきい値', min: 0.1, max: 20, step: 0.1, unit: 'm' },
@@ -68,7 +66,6 @@ export class OverlayUI {
   private timerSeekEl!: HTMLElement;
   private cooldownRing!: SVGCircleElement;
   private cooldownWrap!: HTMLElement;
-  private radarBtn!: HTMLButtonElement;
   private radarGlowEl!: HTMLElement;
   private resultMessageEl!: HTMLElement;
   private errorMsgEl!: HTMLElement;
@@ -116,7 +113,23 @@ export class OverlayUI {
     this.toastContainer = el('div', 'toast-container');
     this.root.appendChild(this.toastContainer);
 
+    this.installBeforeXrSelectGuard();
+
     return { title, settings, hide, handover, seek, result, error };
+  }
+
+  /**
+   * DOM overlay上のボタン・リンク・フォーム要素をタップしたとき、ARのselectが同時発火して
+   * 宝箱が動いてしまう事故を防ぐ。画面全体でpreventDefaultするとタップ全体が効かなくなる
+   * (今回の不具合の原因)ため、対話要素の上でのみpreventDefaultする。
+   */
+  private installBeforeXrSelectGuard(): void {
+    this.root.addEventListener('beforexrselect', (ev) => {
+      const target = ev.target as HTMLElement | null;
+      if (target && target.closest('button, a, input, select, textarea, label')) {
+        ev.preventDefault();
+      }
+    });
   }
 
   private buildTitle(): HTMLElement {
@@ -275,27 +288,12 @@ export class OverlayUI {
           <circle class="cooldown-ring-fg" data-role="cooldown-ring" cx="24" cy="24" r="20"></circle>
         </svg>
       </div>
-      <button type="button" class="radar-btn" data-action="radar" aria-label="レーダー(長押しで作動)"></button>
     `;
     this.timerSeekEl = screen.querySelector('[data-role="timer"]') as HTMLElement;
     this.radarGlowEl = screen.querySelector('[data-role="radar-glow"]') as HTMLElement;
     this.cooldownWrap = screen.querySelector('[data-role="cooldown-wrap"]') as HTMLElement;
     this.cooldownRing = screen.querySelector('[data-role="cooldown-ring"]') as unknown as SVGCircleElement;
     this.cooldownRing.style.strokeDasharray = `${OverlayUI.COOLDOWN_CIRC}`;
-    this.radarBtn = screen.querySelector('[data-action="radar"]') as HTMLButtonElement;
-
-    const press = (ev: Event) => {
-      ev.preventDefault();
-      this.actions.onRadarPress();
-    };
-    const release = (ev: Event) => {
-      ev.preventDefault();
-      this.actions.onRadarRelease();
-    };
-    this.radarBtn.addEventListener('pointerdown', press);
-    this.radarBtn.addEventListener('pointerup', release);
-    this.radarBtn.addEventListener('pointercancel', release);
-    this.radarBtn.addEventListener('pointerleave', release);
 
     return screen;
   }
