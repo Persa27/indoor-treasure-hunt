@@ -126,17 +126,18 @@ export class TreasureView {
   }
 
   /**
-   * 隠すターンのプレビュー: 土盛りマーク+半透明の宝箱を表示する。呼ぶたび移動。
+   * 隠すターンのプレビュー: 埋まった見た目にはせず、宝箱を完全に不透明・地上に置いた状態で表示する。
+   * 呼ぶたび移動。
    */
   showAt(pos: Vec3): void {
     this.popping = false;
     this.group.position.set(pos.x, pos.y, pos.z);
     this.group.visible = true;
 
-    this.mound.visible = true;
-    this.setChestOpacity(0.5);
+    this.mound.visible = false;
+    this.setChestOpacity(1);
     this.chest.visible = true;
-    this.chest.position.y = -0.03; // 土に少し沈んだ見え方にする
+    this.chest.position.y = 0;
     this.setLidOpen(false, true);
 
     this.idleFloating = true;
@@ -183,7 +184,7 @@ export class TreasureView {
     if (this.idleFloating) {
       this.idleAgeMs += dtMs;
       const t = this.idleAgeMs / 1000;
-      this.chest.position.y = -0.03 + Math.sin(t * 1.6) * 0.01;
+      this.chest.position.y = Math.sin(t * 1.6) * 0.01;
     }
 
     if (this.popping) {
