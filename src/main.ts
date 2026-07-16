@@ -8,7 +8,7 @@ import { TurnTimer } from './game/timer';
 import { DigJudge } from './game/judge';
 import { computeRadar } from './game/radar';
 import { Beeper } from './audio/beeper';
-import { OverlayUI, type UIActions } from './ui/overlay';
+import { OverlayUI, icon, type UIActions } from './ui/overlay';
 import { loadSettings, saveSettings } from './settings';
 import type { GamePhase, GameSettings, Vec3 } from './types';
 
@@ -114,7 +114,7 @@ const sessionCallbacks: ARSessionCallbacks = {
   },
   onTrackingChange(degraded) {
     if (degraded) {
-      overlay.toast('トラッキングが不安定です。明るい場所でゆっくり動かしてください');
+      overlay.toast(`${icon('compass')} ちょっと道に迷ったかも。明るい場所でゆっくり動かしてね`);
     }
   },
   onSessionEnd() {
@@ -198,7 +198,7 @@ function handleSelect(hit: Vec3 | null): void {
   const phase = state.getPhase();
   if (phase === 'hide') {
     if (!hit) {
-      overlay.toast('平面を検出できません。少し端末を動かしてください');
+      overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
       return;
     }
     const hitResult = session?.getLastHitResult() ?? undefined;
@@ -245,7 +245,7 @@ function finishHideTurn(placed: boolean): void {
 function handleSeekSelect(hit: Vec3 | null): void {
   if (!judge || judge.isCoolingDown()) return;
   if (!hit) {
-    overlay.toast('平面を検出できません。少し端末を動かしてください');
+    overlay.toast(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを少し動かしてね`);
     return;
   }
 

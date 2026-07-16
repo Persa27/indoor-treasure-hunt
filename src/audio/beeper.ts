@@ -118,20 +118,26 @@ export class Beeper {
     }
   }
 
-  /** 上昇アルペジオ風ファンファーレ(3〜5音)。 */
+  /** 上昇アルペジオ風ファンファーレ(5音+仕上げのキラキラ和音)。子ども向けに明るく賑やかな音色にする。 */
   playSuccess(): void {
     if (!this.enabled) return;
-    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5]; // C5, E5, G5, C6, E6
     const ctx = this.ensureContext();
     if (!ctx || ctx.state === 'suspended') return;
     notes.forEach((freq, i) => {
-      const startAt = ctx.currentTime + i * 0.11;
+      const startAt = ctx.currentTime + i * 0.09;
       const delayMs = Math.max(0, (startAt - ctx.currentTime) * 1000);
-      setTimeout(() => this.playTone(freq, 0.18, 0.28, 'triangle'), delayMs);
+      setTimeout(() => this.playTone(freq, 0.2, 0.3, 'triangle'), delayMs);
     });
+    // 仕上げのキラキラ和音(高音の同時鳴り)
+    const sparkleDelayMs = notes.length * 90 + 40;
+    setTimeout(() => {
+      this.playTone(1567.98, 0.35, 0.2, 'sine'); // G6
+      this.playTone(2093, 0.35, 0.14, 'sine'); // C7
+    }, sparkleDelayMs);
   }
 
-  /** スコップで掘る「ザクッ」という低い短いブザー。 */
+  /** スコップで掘る「ポフッ」という軽くコミカルな短い音(子ども向けに柔らかく)。 */
   playMiss(): void {
     if (!this.enabled) return;
     const ctx = this.ensureContext();
@@ -139,18 +145,18 @@ export class Beeper {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(180, now);
-    osc.frequency.exponentialRampToValueAtTime(70, now + 0.16);
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.14);
 
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.28, now + 0.01);
-    gain.gain.linearRampToValueAtTime(0, now + 0.2);
+    gain.gain.linearRampToValueAtTime(0.24, now + 0.01);
+    gain.gain.linearRampToValueAtTime(0, now + 0.18);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.22);
+    osc.stop(now + 0.2);
     osc.addEventListener('ended', () => {
       osc.disconnect();
       gain.disconnect();

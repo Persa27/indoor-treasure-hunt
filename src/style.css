@@ -1,27 +1,46 @@
 /* 担当Phase2エージェントが実装する。対応SPEC.md: 9章(アクセシビリティ・UI要件) */
 
 /* -------------------------------------------------------------------------
-   デザインコンセプト: 「夜の探検隊の道具」
-   カメラ映像(現実の部屋)の上に載る真鍮と羊皮紙のHUD。単一ダークテーマ。
+   デザインコンセプト: 「海賊のたからさがし」
+   古びた地図(羊皮紙)と木箱の質感を土台にした、手作り感のあるHUD。
+   角丸ピル+ネオングロー的な均質デザインを避け、羊皮紙・木目・鉄びょう・
+   千切れた紙の縁といった「素材」で世界観を出す。
+   画像: public/img/parchment.jpg, public/img/wood-plank.jpg (出典・ライセンスはSPEC.md 6.5参照)
+   アイコン: public/img/icons.svg (自作SVGスプライト、絵文字は使用しない)
+   フォントはシステムフォントのみ(SPEC 6.5)。
    ------------------------------------------------------------------------- */
 
 :root {
-  --ink: #0f1520;
-  --ink-panel: rgba(15, 21, 32, 0.82);
-  --ink-panel-strong: rgba(15, 21, 32, 0.92);
-  --paper: #f0e9d8;
-  --brass: #c9a24b;
-  --dim: #97907e;
-  --danger: #b8462e;
+  --ink: #2a1608;
+  --ink-soft: #4a2c12;
+  --parchment-text: #2a1608;
+  --paper: #f3e6c8;
+  --hud-panel: rgba(20, 14, 8, 0.72);
+  --hud-panel-strong: rgba(20, 14, 8, 0.86);
+  --brass: #b3862c;
+  --brass-bright: #dba83f;
+  --iron: #241a12;
+  --coral: #8f2c1c;
+  --dim: #caa877;
 
-  /* レーダー色(SPEC 3.5固定) */
-  --radar-far: #3e7bd6;
-  --radar-mid: #d6b93e;
-  --radar-near: #d67b2e;
-  --radar-hot: #d63e3e;
+  --danger: var(--coral);
+
+  /* レーダー色(SPEC 3.5固定の色相を維持しつつ、視認性重視でしっかり発色させる) */
+  --radar-far: #2f86ff;
+  --radar-mid: #ffd83f;
+  --radar-near: #ff9a2e;
+  --radar-hot: #ff3b3b;
 
   --font-jp: 'Yu Gothic UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  --radius: 2px;
+  --radius: 8px;
+
+  /* 千切れた紙の縁(固定ギザギザ形状)。パネル・トースト・見出し帯に使う */
+  --torn-edge: polygon(
+    0% 5%, 4% 1%, 9% 4%, 14% 0%, 19% 4%, 24% 1%, 29% 4%, 34% 0%, 39% 4%, 44% 1%,
+    49% 4%, 54% 0%, 59% 4%, 64% 1%, 69% 4%, 74% 0%, 79% 4%, 84% 1%, 89% 4%, 94% 0%, 100% 4%,
+    100% 95%, 96% 99%, 91% 96%, 86% 100%, 81% 96%, 76% 99%, 71% 96%, 66% 100%, 61% 96%, 56% 99%,
+    51% 96%, 46% 100%, 41% 96%, 36% 99%, 31% 96%, 26% 100%, 21% 96%, 16% 99%, 11% 96%, 6% 100%, 0% 96%
+  );
 }
 
 * {
@@ -34,7 +53,7 @@ body {
   padding: 0;
   width: 100%;
   height: 100%;
-  background: var(--ink);
+  background: #150d07;
   color: var(--paper);
   font-family: var(--font-jp);
   overscroll-behavior: none;
@@ -61,8 +80,25 @@ a {
 }
 
 :focus-visible {
-  outline: 2px solid var(--brass);
+  outline: 3px solid var(--brass-bright);
   outline-offset: 2px;
+}
+
+ruby {
+  ruby-position: over;
+}
+
+rt {
+  font-size: 0.55em;
+  font-weight: 700;
+  user-select: none;
+}
+
+.icon {
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
 }
 
 /* -------------------------------------------------------------------------
@@ -82,30 +118,50 @@ a {
 }
 
 /* title / settings / result / error はカメラ映像がない(またはARの下地がない)ため、
-   読みやすさ優先で不透明の地を敷く */
+   読みやすさ優先で羊皮紙の地を敷く。文字はダークインクで表示する。 */
 .screen-title,
 .screen-settings,
 .screen-result,
 .screen-error {
-  background: var(--ink);
+  background: linear-gradient(rgba(20, 12, 4, 0.28), rgba(20, 12, 4, 0.42)), url('/img/parchment.jpg');
+  background-size: cover;
+  background-position: center;
+  color: var(--parchment-text);
+}
+
+.screen-title .eyebrow,
+.screen-settings .eyebrow,
+.screen-result .eyebrow,
+.screen-error .eyebrow,
+.screen-title h1,
+.screen-settings h1,
+.screen-result h1,
+.screen-error h1,
+.screen-title .notice,
+.screen-title li {
+  color: var(--parchment-text);
 }
 
 /* -------------------------------------------------------------------------
-   見出し・眉ラベル
+   見出し・眉ラベル(=蝋引き紐で吊るした木札風タグ)
    ------------------------------------------------------------------------- */
 
 .eyebrow {
-  margin: 0 0 4px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--brass);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 5px 12px 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: var(--iron);
+  color: var(--paper);
+  clip-path: var(--torn-edge);
 }
 
 .eyebrow-sub {
-  margin-top: 12px;
-  color: var(--dim);
+  margin-top: 14px;
 }
 
 .title-head {
@@ -120,20 +176,20 @@ a {
 h1 {
   margin: 0;
   font-size: 32px;
-  line-height: 1.2;
-  color: var(--paper);
-  font-weight: 700;
+  line-height: 1.3;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 h2 {
   margin: 0 0 6px;
-  font-size: 16px;
-  color: var(--paper);
+  font-size: 17px;
+  font-weight: 800;
 }
 
 p,
 li {
-  line-height: 1.7;
+  line-height: 1.8;
   max-width: 34em;
 }
 
@@ -146,18 +202,21 @@ li {
 }
 
 .howto {
-  margin-top: 24px;
+  margin-top: 20px;
   overflow-y: auto;
 }
 
 .howto ol {
   margin: 4px 0 12px;
-  padding-left: 1.2em;
-  color: var(--paper);
+  padding-left: 1.4em;
+}
+
+.howto li {
+  margin-bottom: 6px;
 }
 
 .notice {
-  color: var(--dim);
+  color: var(--ink-soft);
   font-size: 13px;
 }
 
@@ -167,14 +226,15 @@ li {
 }
 
 .start-reason {
-  color: var(--danger);
+  color: var(--coral);
+  font-weight: 700;
   font-size: 13px;
   min-height: 1.2em;
   margin: 0 0 8px;
 }
 
 /* -------------------------------------------------------------------------
-   ボタン
+   ボタン: 木箱の板+鉄びょう。角丸ピルではなく木の看板のような矩形。
    ------------------------------------------------------------------------- */
 
 .button-row {
@@ -183,33 +243,68 @@ li {
 }
 
 .btn {
-  min-height: 48px;
+  position: relative;
+  min-height: 52px;
   min-width: 48px;
-  padding: 0 18px;
-  background: transparent;
+  padding: 0 22px;
+  background: linear-gradient(rgba(20, 12, 4, 0.45), rgba(20, 12, 4, 0.55)), url('/img/wood-plank.jpg');
+  background-size: 160px;
   color: var(--paper);
-  border: 1px solid var(--brass);
+  border: 1px solid #0e0a06;
   border-radius: var(--radius);
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.02em;
   cursor: pointer;
+  box-shadow: 0 3px 0 #0e0a06, 0 5px 10px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.btn::before,
+.btn::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--brass-bright), var(--brass) 70%, #6b4d18 100%);
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+}
+
+.btn::before {
+  left: 6px;
+}
+
+.btn::after {
+  right: 6px;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 #0e0a06, 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .btn-primary {
-  background: var(--ink-panel-strong);
-  border-left: 3px solid var(--brass);
-  font-weight: 700;
+  color: #fff3d6;
+  border-color: var(--brass);
+  box-shadow: 0 3px 0 #6b4d18, 0 5px 12px rgba(0, 0, 0, 0.45);
+}
+
+.btn-primary:active:not(:disabled) {
+  box-shadow: 0 0 0 #6b4d18, 0 2px 4px rgba(0, 0, 0, 0.35);
 }
 
 .btn-large {
   flex: 1;
-  min-height: 56px;
-  font-size: 16px;
+  min-height: 60px;
+  font-size: 18px;
 }
 
 /* -------------------------------------------------------------------------
@@ -234,11 +329,14 @@ li {
   grid-column: 1 / -1;
   grid-template-columns: subgrid;
   align-items: center;
+  background: rgba(42, 22, 8, 0.08);
+  border-left: 3px solid var(--brass);
+  padding: 8px 10px;
 }
 
 .field-row label {
   font-size: 13px;
-  color: var(--paper);
+  font-weight: 700;
 }
 
 .field-range {
@@ -250,8 +348,8 @@ li {
   min-width: 5em;
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--brass);
+  font-weight: 800;
+  color: var(--ink);
   font-size: 13px;
 }
 
@@ -261,7 +359,7 @@ li {
   gap: 24px;
   margin-top: 8px;
   padding-top: 12px;
-  border-top: 1px solid rgba(201, 162, 75, 0.3);
+  border-top: 2px solid rgba(42, 22, 8, 0.3);
 }
 
 .toggle-label {
@@ -269,17 +367,17 @@ li {
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: var(--paper);
+  font-weight: 700;
 }
 
 .toggle-label input {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   accent-color: var(--brass);
 }
 
 /* -------------------------------------------------------------------------
-   HUD(隠す/探すターン共通)
+   HUD(隠す/探すターン共通): カメラ映像の上に載る革タグ風パネル
    ------------------------------------------------------------------------- */
 
 .hud-corner {
@@ -293,52 +391,61 @@ li {
 }
 
 .timer-pad {
-  background: var(--ink-panel);
-  border-bottom: 1px solid var(--brass);
-  border-radius: var(--radius);
-  padding: 6px 12px;
+  display: inline-block;
+  background: var(--hud-panel-strong);
+  border: 1px solid var(--brass);
+  padding: 7px 14px;
   font-size: 22px;
-  font-weight: 700;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--paper);
+  clip-path: var(--torn-edge);
+}
+
+.timer-pad:empty {
+  display: none;
 }
 
 .guide-pad {
   align-self: center;
   margin-top: auto;
   margin-bottom: auto;
-  background: var(--ink-panel);
-  border-radius: var(--radius);
-  padding: 10px 16px;
-  font-size: 14px;
+  background: var(--hud-panel-strong);
+  border: 1px solid var(--brass);
+  padding: 16px 22px;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--paper);
   text-align: center;
+  clip-path: var(--torn-edge);
 }
 
 /* -------------------------------------------------------------------------
-   手渡し画面: 覗き見防止のため完全不透明
+   手渡し画面: 覗き見防止のため完全不透明(閉じた宝の地図のイメージ)
    ------------------------------------------------------------------------- */
 
 .screen-handover.opaque {
-  background: #0f1520;
+  background: linear-gradient(rgba(10, 6, 3, 0.78), rgba(10, 6, 3, 0.88)), url('/img/parchment.jpg');
+  background-size: cover;
+  background-position: center;
   justify-content: center;
   align-items: center;
   text-align: center;
 }
 
 .screen-handover .eyebrow {
-  text-align: center;
+  justify-content: center;
 }
 
 .handover-warning {
   max-width: 28em;
   font-size: 17px;
-  font-weight: 700;
-  color: var(--danger);
-  background: rgba(184, 70, 46, 0.12);
-  border: 1px solid var(--danger);
-  border-radius: var(--radius);
-  padding: 16px 20px;
+  font-weight: 800;
+  color: #fff3d6;
+  background: rgba(143, 44, 28, 0.35);
+  border: 1px solid var(--coral);
+  padding: 18px 24px;
+  clip-path: var(--torn-edge);
 }
 
 .screen-handover .bottom-bar {
@@ -371,6 +478,7 @@ li {
   height: 80px;
   z-index: 7;
   pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 .cooldown-ring {
@@ -381,13 +489,13 @@ li {
 
 .cooldown-ring-bg {
   fill: none;
-  stroke: rgba(240, 233, 216, 0.15);
+  stroke: rgba(243, 230, 200, 0.2);
   stroke-width: 3;
 }
 
 .cooldown-ring-fg {
   fill: none;
-  stroke: var(--paper);
+  stroke: var(--brass-bright);
   stroke-width: 3;
   stroke-linecap: round;
   transition: stroke-dashoffset 0.2s linear;
@@ -437,7 +545,8 @@ li {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .radar-glow {
+  .radar-glow,
+  .btn {
     animation: none !important;
     transition: none;
   }
@@ -452,34 +561,33 @@ li {
 }
 
 .result-message {
-  font-size: 26px;
+  font-size: 25px;
   margin-top: 8px;
 }
 
 .error-message {
-  color: var(--danger);
-  font-weight: 700;
+  color: var(--coral);
+  font-weight: 800;
   margin-top: 8px;
 }
 
 .error-guide {
   margin-top: 16px;
   overflow-y: auto;
-  border-top: 1px solid rgba(201, 162, 75, 0.3);
+  border-top: 2px solid rgba(42, 22, 8, 0.3);
   padding-top: 12px;
 }
 
 .error-guide p {
   font-size: 13px;
-  color: var(--paper);
 }
 
 .error-guide strong {
-  color: var(--brass);
+  color: var(--coral);
 }
 
 /* -------------------------------------------------------------------------
-   トースト
+   トースト(木の杭に留めた紙のお知らせ)
    ------------------------------------------------------------------------- */
 
 .toast-container {
@@ -490,26 +598,106 @@ li {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   z-index: 50;
   pointer-events: none;
 }
 
 .toast {
-  background: var(--ink-panel-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(rgba(243, 230, 200, 0.94), rgba(243, 230, 200, 0.94)), url('/img/parchment.jpg');
+  background-size: 220px;
   border: 1px solid var(--brass);
-  border-radius: var(--radius);
-  padding: 10px 16px;
+  padding: 10px 18px;
   font-size: 13px;
-  color: var(--paper);
+  font-weight: 700;
+  color: var(--ink);
+  clip-path: var(--torn-edge);
+  transform: rotate(-1deg);
   opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  translate: 0 6px;
+  transition: opacity 0.25s ease, translate 0.25s ease;
 }
 
 .toast.visible {
   opacity: 1;
-  transform: translateY(0);
+  translate: 0 0;
+}
+
+/* -------------------------------------------------------------------------
+   平面未検出ガイド: スマホを8の字に動かすお手本を半透明アニメーションで表示
+   ------------------------------------------------------------------------- */
+
+.motion-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.motion-guide.visible {
+  opacity: 1;
+}
+
+.motion-guide-track {
+  position: relative;
+  width: 200px;
+  height: 130px;
+}
+
+.motion-guide-track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: none;
+  border-radius: 50%;
+  /* 8の字の軌跡そのものをうっすら見せる(2つの円が接する形) */
+  box-shadow:
+    inset 50px 0 0 -46px rgba(243, 230, 200, 0.55),
+    inset -50px 0 0 -46px rgba(243, 230, 200, 0.55);
+  opacity: 0.5;
+}
+
+.motion-guide-phone {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 36px;
+  height: 36px;
+  color: var(--paper);
+  opacity: 0.85;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.6));
+  offset-path: path('M100,65 C100,25 20,25 20,65 C20,105 100,105 100,65 C100,25 180,25 180,65 C180,105 100,105 100,65 Z');
+  offset-rotate: 0deg;
+  animation: motion-guide-move 3.2s ease-in-out infinite;
+}
+
+.motion-guide-phone .icon {
+  width: 100%;
+  height: 100%;
+}
+
+@keyframes motion-guide-move {
+  0% {
+    offset-distance: 0%;
+  }
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-guide-phone {
+    animation: none !important;
+    offset-distance: 0%;
+  }
 }
 
 /* -------------------------------------------------------------------------
@@ -528,9 +716,11 @@ li {
     z-index: 100;
     align-items: center;
     justify-content: center;
-    background: var(--ink);
-    color: var(--paper);
+    background: url('/img/parchment.jpg');
+    background-size: cover;
+    color: var(--ink);
     text-align: center;
-    font-size: 18px;
+    font-size: 19px;
+    font-weight: 700;
   }
 }

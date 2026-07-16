@@ -29,21 +29,21 @@ interface NumericFieldDef {
 }
 
 const NUMERIC_FIELDS: NumericFieldDef[] = [
-  { key: 'treasureCount', label: '宝箱の数', min: 1, max: 5, step: 1, unit: '個' },
-  { key: 'hideTimeSec', label: '隠す時間', min: 15, max: 300, step: 1, unit: '秒' },
-  { key: 'seekTimeSec', label: '探す時間', min: 30, max: 600, step: 1, unit: '秒' },
-  { key: 'successRadiusM', label: '成功半径', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
-  { key: 'digCooldownSec', label: 'スコップのインターバル', min: 0, max: 10, step: 0.5, unit: '秒' },
+  { key: 'treasureCount', label: '<ruby>宝箱<rt>たからばこ</rt></ruby>の数', min: 1, max: 5, step: 1, unit: '個' },
+  { key: 'hideTimeSec', label: '<ruby>隠<rt>かく</rt></ruby>す時間', min: 15, max: 300, step: 1, unit: '秒' },
+  { key: 'seekTimeSec', label: '<ruby>探<rt>さが</rt></ruby>す時間', min: 30, max: 600, step: 1, unit: '秒' },
+  { key: 'successRadiusM', label: 'あたり<ruby>半径<rt>はんけい</rt></ruby>', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
+  { key: 'digCooldownSec', label: 'スコップのまち時間', min: 0, max: 10, step: 0.5, unit: '秒' },
   { key: 'radarNearM', label: 'レーダー近しきい値', min: 0.1, max: 5, step: 0.1, unit: 'm' },
   { key: 'radarMidM', label: 'レーダー中しきい値', min: 0.1, max: 10, step: 0.1, unit: 'm' },
   { key: 'radarFarM', label: 'レーダー遠しきい値', min: 0.1, max: 20, step: 0.1, unit: 'm' },
 ];
 
 const RESULT_MESSAGES: Record<GameResult, string> = {
-  'seeker-win': '発掘成功！見つける側の勝ち！',
-  'hider-win': '時間切れ！隠す側の勝ち！',
-  'hider-forfeit': '宝箱未配置のため隠す側の負け',
-  aborted: 'トラッキングが失われたため無効試合',
+  'seeker-win': '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ発見！さがす人のかち！',
+  'hider-win': 'じかんぎれ！かくす人のかち！',
+  'hider-forfeit': '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、かくす人のまけ',
+  aborted: 'ARがうまく動かなかったので、引き分け',
 };
 
 const RADAR_LEVELS: RadarLevel[] = ['far', 'mid', 'near', 'hot'];
@@ -55,6 +55,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
   const node = document.createElement(tag);
   if (className) node.className = className;
   return node;
+}
+
+// 自作SVGスプライト(public/img/icons.svg)を参照する。絵文字は使用しない方針(SPEC 6.5)。
+export function icon(name: string): string {
+  return `<svg class="icon" aria-hidden="true" focusable="false"><use href="/img/icons.svg#icon-${name}"></use></svg>`;
 }
 
 export class OverlayUI {
@@ -80,6 +85,8 @@ export class OverlayUI {
   private resultMessageEl!: HTMLElement;
   private errorMsgEl!: HTMLElement;
   private toastContainer!: HTMLElement;
+  private motionGuideEl!: HTMLElement;
+  private motionGuideHideTimerId: ReturnType<typeof setTimeout> | null = null;
 
   private vibrationEnabled = true;
   private vibrateTimerId: ReturnType<typeof setInterval> | null = null;
@@ -123,6 +130,16 @@ export class OverlayUI {
     this.toastContainer = el('div', 'toast-container');
     this.root.appendChild(this.toastContainer);
 
+    this.motionGuideEl = el('div', 'motion-guide');
+    this.motionGuideEl.hidden = true;
+    // 静的テンプレートのみ(動的値なし)のためinnerHTMLでアイコンを埋め込む
+    this.motionGuideEl.innerHTML = `
+      <div class="motion-guide-track">
+        <div class="motion-guide-phone">${icon('vibrate')}</div>
+      </div>
+    `;
+    this.root.appendChild(this.motionGuideEl);
+
     this.installBeforeXrSelectGuard();
 
     return { title, settings, hide, handover, seek, result, error };
@@ -146,25 +163,25 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-title');
     screen.innerHTML = `
       <div class="title-head">
-        <p class="eyebrow">INDOOR TREASURE HUNT</p>
-        <h1>AR宝探し</h1>
+        <p class="eyebrow">${icon('skull')} たからさがしぼうけん</p>
+        <h1>AR<ruby>宝<rt>たから</rt></ruby>さがし</h1>
       </div>
       <div class="howto">
-        <p class="eyebrow eyebrow-sub">HOW TO PLAY</p>
+        <p class="eyebrow eyebrow-sub">${icon('map')} あそびかた</p>
         <ol>
-          <li>1台の端末を2人で交代しながら使います。</li>
-          <li>隠す側: 端末をかざして床や家具の上に宝箱を配置します。</li>
-          <li>手渡し: 画面を伏せたり消したりせず、見つける側に渡します。</li>
-          <li>見つける側: 画面をタップして発掘し、レーダーを頼りに宝箱を探します。</li>
+          <li>1台のスマホを2人で<ruby>交代<rt>こうたい</rt></ruby>してつかうよ。</li>
+          <li><ruby>隠<rt>かく</rt></ruby>す人: スマホをかざして、ゆかや家具の上に<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう。</li>
+          <li>わたすとき: 画面を消したり伏せたりしないで、さがす人にわたそう。</li>
+          <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップしてほって、レーダーをたよりに宝箱を見つけよう!</li>
         </ol>
-        <p class="notice">対応環境: ARCore対応の Android + Chrome。iPhone(iOS Safari)には対応していません。</p>
-        <p class="notice">カメラ映像は端末内でARの表示にのみ使われ、保存や外部送信は一切行われません。</p>
+        <p class="notice">つかえる機種: ARCore対応のAndroid + Chrome。iPhoneでは遊べません。</p>
+        <p class="notice">カメラの映像はARの表示だけに使われ、保存や外部そうしんは一切ありません。</p>
       </div>
       <div class="bottom-bar">
         <p class="start-reason" data-role="start-reason"></p>
         <div class="button-row">
-          <button type="button" class="btn" data-action="settings">設定</button>
-          <button type="button" class="btn btn-primary" data-action="start">ゲーム開始</button>
+          <button type="button" class="btn" data-action="settings">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby></button>
+          <button type="button" class="btn btn-primary" data-action="start">スタート！${icon('compass')}</button>
         </div>
       </div>
     `;
@@ -181,7 +198,7 @@ export class OverlayUI {
   private buildSettings(): HTMLElement {
     const screen = el('section', 'screen screen-settings');
     const head = el('div', 'title-head title-head-compact');
-    head.innerHTML = '<p class="eyebrow">SETTINGS</p><h1>設定</h1>';
+    head.innerHTML = `<p class="eyebrow">${icon('gear')} せってい</p><h1><ruby>設定<rt>せってい</rt></ruby></h1>`;
     screen.appendChild(head);
 
     const scroll = el('div', 'settings-scroll');
@@ -190,7 +207,8 @@ export class OverlayUI {
       const row = el('div', 'field-row');
       const label = el('label');
       label.htmlFor = `field-${field.key}`;
-      label.textContent = field.label;
+      // fieldはソース定数(NUMERIC_FIELDS)のみでユーザー入力はないため、ルビ表示にinnerHTMLを使う
+      label.innerHTML = field.label;
 
       const input = el('input', 'field-range');
       input.type = 'range';
@@ -218,14 +236,18 @@ export class OverlayUI {
     const soundLabel = el('label', 'toggle-label');
     this.soundInput = el('input');
     this.soundInput.type = 'checkbox';
+    const soundText = el('span');
+    soundText.innerHTML = ` ${icon('speaker')} <ruby>効果音<rt>こうかおん</rt></ruby>`;
     soundLabel.appendChild(this.soundInput);
-    soundLabel.appendChild(document.createTextNode(' 効果音'));
+    soundLabel.appendChild(soundText);
 
     const vibLabel = el('label', 'toggle-label');
     this.vibrationInput = el('input');
     this.vibrationInput.type = 'checkbox';
+    const vibText = el('span');
+    vibText.innerHTML = ` ${icon('vibrate')} ぶるぶる`;
     vibLabel.appendChild(this.vibrationInput);
-    vibLabel.appendChild(document.createTextNode(' バイブレーション'));
+    vibLabel.appendChild(vibText);
 
     toggleRow.appendChild(soundLabel);
     toggleRow.appendChild(vibLabel);
@@ -251,14 +273,14 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-hide');
     screen.innerHTML = `
       <div class="hud-corner hud-tl">
-        <p class="eyebrow">HIDER'S TURN</p>
+        <p class="eyebrow">${icon('spade')} <ruby>隠<rt>かく</rt></ruby>す番</p>
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="hide-progress"></div>
       </div>
-      <div class="guide-pad">タップで宝箱を置く(最後の1個は置き直し可)</div>
+      <div class="guide-pad">タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(さいごの1こは置きなおしOK)</div>
       <div class="bottom-bar">
         <div class="button-row">
-          <button type="button" class="btn btn-primary btn-large" data-action="confirm-hide" disabled>ここに隠す(確定)</button>
+          <button type="button" class="btn btn-primary btn-large" data-action="confirm-hide" disabled>ここにうめる！${icon('chest')}</button>
         </div>
       </div>
     `;
@@ -272,11 +294,11 @@ export class OverlayUI {
   private buildHandover(): HTMLElement {
     const screen = el('section', 'screen screen-handover opaque');
     screen.innerHTML = `
-      <p class="eyebrow">HANDOVER</p>
-      <div class="handover-warning">⚠ 画面を消したり端末を伏せたりしないでください(宝の位置が失われます)</div>
+      <p class="eyebrow">${icon('hourglass')} わたすとき</p>
+      <div class="handover-warning">${icon('warning')} 画面を消したり、下に向けたりしないでね!(宝の場所がわからなくなっちゃうよ)</div>
       <div class="bottom-bar">
         <div class="button-row">
-          <button type="button" class="btn btn-primary btn-large" data-action="start-seek">探索スタート</button>
+          <button type="button" class="btn btn-primary btn-large" data-action="start-seek">たんけんスタート！${icon('lantern')}</button>
         </div>
       </div>
     `;
@@ -291,7 +313,7 @@ export class OverlayUI {
     screen.innerHTML = `
       <div class="radar-glow" data-role="radar-glow"></div>
       <div class="hud-corner hud-tl">
-        <p class="eyebrow">SEEKER'S TURN</p>
+        <p class="eyebrow">${icon('lantern')} <ruby>探<rt>さが</rt></ruby>す番</p>
         <div class="timer-pad" data-role="timer"></div>
       </div>
       <div class="cooldown-wrap" data-role="cooldown-wrap" hidden>
@@ -314,12 +336,12 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-result');
     screen.innerHTML = `
       <div class="title-head">
-        <p class="eyebrow">RESULT</p>
+        <p class="eyebrow">${icon('trophy')} けっか</p>
         <h1 data-role="result-message" class="result-message"></h1>
       </div>
       <div class="bottom-bar">
         <div class="button-row">
-          <button type="button" class="btn btn-primary btn-large" data-action="retry">もう一度</button>
+          <button type="button" class="btn btn-primary btn-large" data-action="retry">もういっかい！${icon('replay')}</button>
         </div>
       </div>
     `;
@@ -334,8 +356,8 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-error');
     screen.innerHTML = `
       <div class="title-head">
-        <p class="eyebrow">ERROR</p>
-        <h1>エラー</h1>
+        <p class="eyebrow">${icon('warning')} エラー</p>
+        <h1>あれ、うまくいかないよ</h1>
       </div>
       <p data-role="error-message" class="error-message"></p>
       <div class="error-guide">
@@ -369,7 +391,8 @@ export class OverlayUI {
       this.applySettingsToForm(this.settings);
     }
     if (phase === 'result' && ctx?.result) {
-      this.resultMessageEl.textContent = RESULT_MESSAGES[ctx.result];
+      // RESULT_MESSAGESは固定の定数テーブル(ユーザー入力なし)のためinnerHTMLでルビ表示を許容する
+      this.resultMessageEl.innerHTML = RESULT_MESSAGES[ctx.result];
     }
     if (phase === 'error') {
       this.errorMsgEl.textContent = ctx?.errorMsg ?? '不明なエラーが発生しました。';
@@ -381,7 +404,7 @@ export class OverlayUI {
   }
 
   updateTimer(remainSec: number): void {
-    const text = `残り ${Math.max(0, Math.ceil(remainSec))}秒`;
+    const text = `のこり ${Math.max(0, Math.ceil(remainSec))}秒`;
     this.timerHideEl.textContent = text;
     this.timerSeekEl.textContent = text;
   }
@@ -450,12 +473,14 @@ export class OverlayUI {
   }
 
   updateHideProgress(placed: number, total: number): void {
-    this.hideProgressEl.textContent = total > 1 ? `配置: ${placed} / ${total}` : '';
+    // placed/totalは内部カウンタ(数値)のみでユーザー入力はないため、アイコン表示にinnerHTMLを使う
+    this.hideProgressEl.innerHTML = total > 1 ? `${icon('coin')} うめた数: ${placed} / ${total}` : '';
   }
 
+  // msgは呼び出し側の固定文言のみを渡す想定(ユーザー入力は含めない)のためinnerHTMLでアイコン表示を許容する
   toast(msg: string): void {
     const node = el('div', 'toast');
-    node.textContent = msg;
+    node.innerHTML = msg;
     this.toastContainer.appendChild(node);
 
     // フェードイン
@@ -464,6 +489,28 @@ export class OverlayUI {
     setTimeout(() => {
       node.classList.remove('visible');
       setTimeout(() => node.remove(), 300);
+    }, 2200);
+  }
+
+  /**
+   * 面が検出できないときのガイド: メッセージのトーストに加えて、
+   * スマホを8の字に動かすお手本を半透明のアニメーションで表示する。
+   */
+  showMoveGuide(msg: string): void {
+    this.toast(msg);
+
+    this.motionGuideEl.hidden = false;
+    requestAnimationFrame(() => this.motionGuideEl.classList.add('visible'));
+
+    if (this.motionGuideHideTimerId !== null) {
+      clearTimeout(this.motionGuideHideTimerId);
+    }
+    this.motionGuideHideTimerId = setTimeout(() => {
+      this.motionGuideHideTimerId = null;
+      this.motionGuideEl.classList.remove('visible');
+      setTimeout(() => {
+        this.motionGuideEl.hidden = true;
+      }, 300);
     }, 2200);
   }
 
