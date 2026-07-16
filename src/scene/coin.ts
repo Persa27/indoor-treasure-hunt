@@ -105,6 +105,15 @@ export class CoinView implements ITreasureView {
     this.ageMs = 0;
   }
 
+  /**
+   * アンカー補正への毎フレーム追従。回収演出中は上昇アニメーションがgroup位置を
+   * 直接動かしているため追従しない(0.4秒程度のためズレは無視できる)。
+   */
+  moveTo(pos: Vec3): void {
+    if (this.collecting) return;
+    this.group.position.set(pos.x, pos.y + 0.015, pos.z);
+  }
+
   /** コインは確定後も常時可視化する仕様のため、非表示にしない。 */
   hide(): void {
     // no-op

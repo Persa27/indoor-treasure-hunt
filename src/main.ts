@@ -135,6 +135,9 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
 
   for (const t of treasures) {
     t.anchor.updateFromFrame(frame, refSpace);
+    // アンカーの補正済み位置にビューを毎フレーム追従させる(空間マップ補正による見た目のズレ防止)
+    const pos = t.anchor.getPosition();
+    if (pos) t.view.moveTo(pos);
     t.view.update(dt);
   }
 

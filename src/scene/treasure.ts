@@ -145,6 +145,17 @@ export class TreasureView implements ITreasureView {
   }
 
   /**
+   * アンカー補正への毎フレーム追従。位置だけを動かし、浮遊・ポップ等の演出状態には触れない
+   * (演出はすべてgroup配下の子のローカル座標で行っているため、group位置の更新と干渉しない)。
+   */
+  moveTo(pos: Vec3): void {
+    this.group.position.set(pos.x, pos.y, pos.z);
+    if (this.popTargetPos) {
+      this.popTargetPos = pos;
+    }
+  }
+
+  /**
    * 確定後(手渡し以降): すべて非表示(埋まった状態)。
    */
   hide(): void {

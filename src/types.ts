@@ -49,6 +49,11 @@ export const DEFAULT_SETTINGS: GameSettings = {
 export interface ITreasureView {
   /** 隠すターンのプレビュー表示(呼ぶたび移動)。 */
   showAt(pos: Vec3): void;
+  /**
+   * アンカーの補正済み位置への毎フレーム追従(位置のみ更新、演出状態はリセットしない)。
+   * ARCoreの空間マップ補正でアンカー位置が動いたとき、見た目を実空間に張り付かせるために必要。
+   */
+  moveTo(pos: Vec3): void;
   /** 確定後の見た目切り替え(宝箱: 非表示化/コイン: 常時可視のため何もしない)。 */
   hide(): void;
   /** 未発見のまま時間切れになった際の開示演出。 */
