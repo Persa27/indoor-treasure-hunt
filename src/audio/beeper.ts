@@ -168,6 +168,30 @@ export class Beeper {
     }, 1150);
   }
 
+  /** 時間切れで負けたときの「残念…」なジングル。下降するしょんぼりフレーズ+暗い和音。
+   * 子ども向けなので悲しすぎず、コミカルに落ち込む程度の音にする。 */
+  playDefeatJingle(): void {
+    if (!this.enabled) return;
+    const ctx = this.ensureContext();
+    if (!ctx || ctx.state === 'suspended') return;
+
+    // [遅延ms, 周波数Hz, 長さsec] 「チャ チャ チャ チャーン…」と下がっていく定番の残念フレーズ
+    const phrase: Array<[number, number, number]> = [
+      [0, 523.25, 0.25], // C5
+      [300, 493.88, 0.25], // B4
+      [600, 466.16, 0.25], // A#4
+      [900, 440, 0.9], // A4(長めに伸ばす)
+    ];
+    for (const [delayMs, freq, dur] of phrase) {
+      setTimeout(() => this.playTone(freq, dur, 0.26, 'triangle'), delayMs);
+    }
+    // 最後の音に重ねる暗めの和音(A4に対する短三度下C#4…ではなくFマイナー系の響き)
+    setTimeout(() => {
+      this.playTone(349.23, 0.9, 0.12, 'triangle'); // F4
+      this.playTone(261.63, 0.9, 0.1, 'triangle'); // C4
+    }, 900);
+  }
+
   /** スコップで掘る「ポフッ」という軽くコミカルな短い音(子ども向けに柔らかく)。 */
   playMiss(): void {
     if (!this.enabled) return;

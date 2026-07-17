@@ -461,6 +461,7 @@ function onSeekTimeExpire(): void {
   }
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
+    beeper.playDefeatJingle();
     state.finishSeek('hider-win');
   }, 1500);
 }
