@@ -21,6 +21,7 @@ export interface GameSettings {
   seekTimeSec: number; // default 180, range 30-600
   successRadiusM: number; // default 0.5, range 0.2-1.5
   digCooldownSec: number; // default 3, range 0-10
+  coinVisibleDistM: number; // default 2.0, range 0.5-10。コインモードで探索中にコインが見える距離
   radarNearM: number; // default 0.5
   radarMidM: number; // default 1.5
   radarFarM: number; // default 3.0
@@ -35,6 +36,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   seekTimeSec: 180,
   successRadiusM: 0.5,
   digCooldownSec: 3,
+  coinVisibleDistM: 2.0,
   radarNearM: 0.5,
   radarMidM: 1.5,
   radarFarM: 3.0,
@@ -62,6 +64,11 @@ export interface ITreasureView {
   collect(pos: Vec3): void;
   /** ハズレのタップに対する演出。 */
   showMiss(pos: Vec3): void;
+  /**
+   * 距離による表示制御(コインモード: プレイヤーが「コインが見える距離」より遠い間は非表示)。
+   * 宝箱モードは埋まっていて元々見えないためno-op。
+   */
+  setProximityHidden(hidden: boolean): void;
   update(dtMs: number): void;
 }
 

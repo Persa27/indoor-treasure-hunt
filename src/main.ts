@@ -51,6 +51,8 @@ interface TreasureSlot {
   anchor: TreasureAnchor;
   view: ITreasureView;
   found: boolean;
+  /** コインモード: プレイヤーが遠いため非表示にしているか(ヒステリシス判定用に保持) */
+  hiddenByDistance: boolean;
 }
 
 // ゲーム進行中に生成/破棄されるAR依存オブジェクト
@@ -141,6 +143,26 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
     t.view.update(dt);
   }
 
+  // コインモード: 探索中は「コインが見える距離」より近づいたときだけコインを表示する(SPEC 3.4b)。
+  // 境界での表示ちらつきを防ぐため、非表示に戻す閾値には+0.3mのヒステリシスを持たせる。
+  if (settings.gameMode === 'coin' && state.getPhase() === 'seek' && viewerPos) {
+    for (const t of treasures) {
+      if (t.found) continue;
+      const pos = t.anchor.getPosition();
+      if (!pos) continue;
+      const dx = pos.x - viewerPos.x;
+      const dy = pos.y - viewerPos.y;
+      const dz = pos.z - viewerPos.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const limit = t.hiddenByDistance ? settings.coinVisibleDistM : settings.coinVisibleDistM + 0.3;
+      const hidden = dist > limit;
+      if (hidden !== t.hiddenByDistance) {
+        t.hiddenByDistance = hidden;
+        t.view.setProximityHidden(hidden);
+      }
+    }
+  }
+
   // レーダーは探索ターン中は常時起動(SPEC 3.5)。ターン終了時はstopSeekLoopsで必ず停止する。
   if (state.getPhase() === 'seek' && viewerPos) {
     const nearest = nearestRemainingTreasurePos(viewerPos);
@@ -216,6 +238,7 @@ function handleSelect(hit: Vec3 | null): void {
         anchor: new TreasureAnchor(),
         view: createTreasureView(settings.gameMode, session!.getScene()),
         found: false,
+        hiddenByDistance: false,
       };
       void slot.anchor.place(hit, hitResult);
       slot.view.showAt(hit);

@@ -18,6 +18,7 @@ interface NumericFieldDef {
     | 'seekTimeSec'
     | 'successRadiusM'
     | 'digCooldownSec'
+    | 'coinVisibleDistM'
     | 'radarNearM'
     | 'radarMidM'
     | 'radarFarM';
@@ -34,6 +35,7 @@ const NUMERIC_FIELDS: NumericFieldDef[] = [
   { key: 'seekTimeSec', label: '<ruby>探<rt>さが</rt></ruby>す時間', min: 30, max: 600, step: 1, unit: '秒' },
   { key: 'successRadiusM', label: 'あたり<ruby>半径<rt>はんけい</rt></ruby>', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
   { key: 'digCooldownSec', label: 'つぎまでのまち時間', min: 0, max: 10, step: 0.5, unit: '秒' },
+  { key: 'coinVisibleDistM', label: 'コインが見えるきょり', min: 0.5, max: 10, step: 0.5, unit: 'm' },
   { key: 'radarNearM', label: 'レーダー近しきい値', min: 0.1, max: 5, step: 0.1, unit: 'm' },
   { key: 'radarMidM', label: 'レーダー中しきい値', min: 0.1, max: 10, step: 0.1, unit: 'm' },
   { key: 'radarFarM', label: 'レーダー遠しきい値', min: 0.1, max: 20, step: 0.1, unit: 'm' },

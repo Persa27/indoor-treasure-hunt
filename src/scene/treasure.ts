@@ -191,6 +191,11 @@ export class TreasureView implements ITreasureView {
     this.spawnDust(pos);
   }
 
+  /** 宝箱は探索中もともと非表示(埋まっている)ため、距離による表示制御は不要。 */
+  setProximityHidden(_hidden: boolean): void {
+    // no-op
+  }
+
   /** 見つける側が発掘成功した瞬間の演出。宝箱は「地中から出てくる」点でreveal()と同一の演出でよい。 */
   collect(pos: Vec3): void {
     this.reveal(pos);

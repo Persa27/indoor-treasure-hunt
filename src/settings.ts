@@ -14,6 +14,7 @@ const RANGES: Record<
   seekTimeSec: { min: 30, max: 600 },
   successRadiusM: { min: 0.2, max: 1.5 },
   digCooldownSec: { min: 0, max: 10 },
+  coinVisibleDistM: { min: 0.5, max: 10 },
   radarNearM: { min: 0, max: 100 },
   radarMidM: { min: 0, max: 100 },
   radarFarM: { min: 0, max: 100 },

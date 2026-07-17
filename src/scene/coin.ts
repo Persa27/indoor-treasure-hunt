@@ -74,6 +74,10 @@ export class CoinView implements ITreasureView {
   private readonly glow: THREE.Sprite;
 
   private ageMs = 0;
+  /** showAt済みで、まだ回収されていない(=本来表示すべき)状態か */
+  private shown = false;
+  /** プレイヤーが「コインが見える距離」より遠いため非表示にしているか */
+  private proximityHidden = false;
   private collecting = false;
   private collectAgeMs = 0;
   private readonly collectDurationMs = 420;
@@ -100,7 +104,9 @@ export class CoinView implements ITreasureView {
   showAt(pos: Vec3): void {
     this.collecting = false;
     this.group.position.set(pos.x, pos.y + 0.015, pos.z);
-    this.group.visible = true;
+    this.shown = true;
+    this.proximityHidden = false;
+    this.applyVisibility();
     this.group.scale.setScalar(1);
     this.ageMs = 0;
   }
@@ -119,9 +125,20 @@ export class CoinView implements ITreasureView {
     // no-op
   }
 
-  /** 時間切れで残ったコインは既に見えているため、追加の開示演出は不要。 */
+  /** 時間切れのネタバラシ: 距離による非表示を解除し、残ったコインを距離に関係なく見せる。 */
   reveal(_pos: Vec3): void {
-    // no-op
+    this.setProximityHidden(false);
+  }
+
+  /** 距離による表示制御。回収済み(shown=false)のコインには影響しない。 */
+  setProximityHidden(hidden: boolean): void {
+    if (this.proximityHidden === hidden) return;
+    this.proximityHidden = hidden;
+    this.applyVisibility();
+  }
+
+  private applyVisibility(): void {
+    this.group.visible = this.shown && !this.proximityHidden;
   }
 
   /** 見つける側がタップして回収した瞬間の演出(縮みながらキラキラ弾けて消える)。 */
@@ -155,7 +172,8 @@ export class CoinView implements ITreasureView {
         this.group.position.y += dtMs * 0.0012;
         if (ct >= 1) {
           this.collecting = false;
-          this.group.visible = false;
+          this.shown = false;
+          this.applyVisibility();
         }
       }
     }
