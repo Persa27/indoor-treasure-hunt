@@ -141,6 +141,24 @@ export class CoinView implements ITreasureView {
     this.group.visible = this.shown && !this.proximityHidden;
   }
 
+  dispose(): void {
+    this.scene.remove(this.group);
+    this.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+      }
+    });
+    this.material.dispose();
+    // glowのテクスチャ(cachedGlowTexture)は全コインで共有しているため破棄しない
+    this.glow.material.dispose();
+    for (const burst of this.bursts) {
+      this.scene.remove(burst.points);
+      burst.geometry.dispose();
+      burst.material.dispose();
+    }
+    this.bursts.length = 0;
+  }
+
   /** 見つける側がタップして回収した瞬間の演出(縮みながらキラキラ弾けて消える)。 */
   collect(pos: Vec3): void {
     if (this.collecting) return;

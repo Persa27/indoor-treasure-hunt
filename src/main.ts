@@ -64,6 +64,16 @@ let judge: DigJudge | null = null;
 let viewerPos: Vec3 | null = null;
 let lastFrameTimeMs: number | null = null;
 
+// 隠すターンのダブルタップ削除: 既存のたから(30cm以内)を600ms以内に2回タップで削除
+const HIDE_DELETE_TAP_NEAR_M = 0.3;
+const HIDE_DOUBLE_TAP_MS = 600;
+// ズレなおし: 画面中央のhit-test点から1m以内の未回収コインを置き直す
+const RESYNC_SNAP_M = 1.0;
+
+let lastHideTapSlot: TreasureSlot | null = null;
+let lastHideTapAtMs = 0;
+let resyncPending = false;
+
 let cooldownIntervalId: ReturnType<typeof setInterval> | null = null;
 let resultTimeoutId: ReturnType<typeof setTimeout> | null = null;
 let sessionEndingIntentionally = false;
@@ -100,6 +110,12 @@ const actions: UIActions = {
     session?.setSelectEnabled(true);
     startCooldownPolling();
     state.startSeek();
+    overlay.updateSeekRemaining(remainingCount());
+  },
+  onResync: () => {
+    if (state.getPhase() !== 'seek' || settings.gameMode !== 'coin') return;
+    // hit-test結果はXRフレーム内でしか安全に扱えないため、次のフレームループで処理する
+    resyncPending = true;
   },
   onRetry: () => {
     handleRetry();
@@ -134,6 +150,11 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
   const now = performance.now();
   const dt = lastFrameTimeMs === null ? 0 : now - lastFrameTimeMs;
   lastFrameTimeMs = now;
+
+  if (resyncPending) {
+    resyncPending = false;
+    processResync(frame);
+  }
 
   for (const t of treasures) {
     t.anchor.updateFromFrame(frame, refSpace);
@@ -173,6 +194,60 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
     }
   }
 };
+
+function remainingCount(): number {
+  return treasures.filter((t) => !t.found).length;
+}
+
+function distance3D(a: Vec3, b: Vec3): number {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  const dz = a.z - b.z;
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+/** 未発見のたからのうち、posから半径radiusM以内で最も近いスロットを返す。 */
+function findSlotNear(pos: Vec3, radiusM: number): TreasureSlot | null {
+  let best: TreasureSlot | null = null;
+  let bestDist = radiusM;
+  for (const t of treasures) {
+    if (t.found) continue;
+    const p = t.anchor.getPosition();
+    if (!p) continue;
+    const d = distance3D(pos, p);
+    if (d <= bestDist) {
+      bestDist = d;
+      best = t;
+    }
+  }
+  return best;
+}
+
+/**
+ * コインのズレなおし(XRフレーム内で実行): 画面中央のhit-test点に最も近い未回収コイン(1m以内)を
+ * その点へ置き直し、アンカーも実面上で再作成する。空間マップのズレでコインが面から浮いて見え、
+ * タップ光線が別の面に当たって判定距離が合わなくなった状態を復旧する。
+ */
+function processResync(frame: XRFrame): void {
+  if (!session || settings.gameMode !== 'coin' || state.getPhase() !== 'seek') return;
+
+  const viewerHit = session.getViewerHitFromFrame(frame);
+  if (!viewerHit) {
+    overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
+    return;
+  }
+
+  const slot = findSlotNear(viewerHit.pos, RESYNC_SNAP_M);
+  if (!slot) {
+    overlay.toast(`${icon('compass')} コインの近くで、コインを画面のまんなかにうつして押してね`);
+    return;
+  }
+
+  void slot.anchor.place(viewerHit.pos, viewerHit.hitResult);
+  slot.hiddenByDistance = false;
+  slot.view.showAt(viewerHit.pos);
+  overlay.toast(`${icon('coin')} コインの場所をなおしたよ！`);
+}
 
 function nearestRemainingTreasurePos(from: Vec3): Vec3 | null {
   let best: Vec3 | null = null;
@@ -232,6 +307,27 @@ function handleSelect(hit: Vec3 | null): void {
       overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
       return;
     }
+
+    // 置いたたからの近く(30cm以内)のタップは配置・移動ではなく削除操作として扱う。
+    // 600ms以内の2回タップ(ダブルタップ)でそのたからを削除し、再配置できるようにする。
+    const nearSlot = findSlotNear(hit, HIDE_DELETE_TAP_NEAR_M);
+    if (nearSlot) {
+      const now = performance.now();
+      if (nearSlot === lastHideTapSlot && now - lastHideTapAtMs <= HIDE_DOUBLE_TAP_MS) {
+        lastHideTapSlot = null;
+        removeTreasureSlot(nearSlot);
+        overlay.toast(`${icon('spade')} けしたよ！べつの場所に置けるよ`);
+        overlay.updateHideProgress(treasures.length, settings.treasureCount);
+        overlay.setConfirmEnabled(treasures.length >= settings.treasureCount);
+      } else {
+        lastHideTapSlot = nearSlot;
+        lastHideTapAtMs = now;
+        overlay.toast(`もういちどすばやくタップすると消せるよ`);
+      }
+      return;
+    }
+    lastHideTapSlot = null;
+
     const hitResult = session?.getLastHitResult() ?? undefined;
     if (treasures.length < settings.treasureCount) {
       const slot: TreasureSlot = {
@@ -253,6 +349,15 @@ function handleSelect(hit: Vec3 | null): void {
   } else if (phase === 'seek') {
     handleSeekSelect(hit);
   }
+}
+
+/** 隠すターンでのたから削除: アンカー・ビューを破棄してスロットを取り除く。 */
+function removeTreasureSlot(slot: TreasureSlot): void {
+  const idx = treasures.indexOf(slot);
+  if (idx < 0) return;
+  treasures.splice(idx, 1);
+  slot.anchor.clear();
+  slot.view.dispose();
 }
 
 function onHideTimeExpire(): void {
@@ -321,6 +426,8 @@ function handleSeekSuccess(slot: TreasureSlot): void {
   if (pos) slot.view.collect(pos);
   beeper.playPop();
   setTimeout(() => beeper.playSuccess(), 250);
+
+  overlay.updateSeekRemaining(remainingCount());
 
   const remaining = treasures.some((t) => !t.found);
   if (remaining) {
@@ -404,6 +511,9 @@ function resetMatchState(): void {
   judge = null;
   viewerPos = null;
   lastFrameTimeMs = null;
+  lastHideTapSlot = null;
+  lastHideTapAtMs = 0;
+  resyncPending = false;
 }
 
 function handleRetry(): void {

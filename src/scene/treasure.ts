@@ -196,6 +196,23 @@ export class TreasureView implements ITreasureView {
     // no-op
   }
 
+  dispose(): void {
+    this.scene.remove(this.group);
+    this.group.traverse((obj) => {
+      if (obj instanceof THREE.Mesh) {
+        obj.geometry.dispose();
+      }
+    });
+    for (const mat of this.chestMaterials) mat.dispose();
+    (this.mound.material as THREE.Material).dispose();
+    for (const burst of this.bursts) {
+      this.scene.remove(burst.points);
+      burst.geometry.dispose();
+      burst.material.dispose();
+    }
+    this.bursts.length = 0;
+  }
+
   /** 見つける側が発掘成功した瞬間の演出。宝箱は「地中から出てくる」点でreveal()と同一の演出でよい。 */
   collect(pos: Vec3): void {
     this.reveal(pos);

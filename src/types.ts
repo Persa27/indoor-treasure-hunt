@@ -69,6 +69,8 @@ export interface ITreasureView {
    * 宝箱モードは埋まっていて元々見えないためno-op。
    */
   setProximityHidden(hidden: boolean): void;
+  /** ビューをシーンから取り除き、リソースを破棄する(隠すターンでの削除用)。 */
+  dispose(): void;
   update(dtMs: number): void;
 }
 

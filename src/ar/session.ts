@@ -137,6 +137,20 @@ export class ARSession {
     return this.lastAcceptedHitResult;
   }
 
+  /**
+   * 現在のフレームでの画面中央(viewer空間)hit-test結果を取得する。
+   * ズレなおし(コインの置き直し)用。XRFrameが有効な間(フレームコールバック内)に呼ぶこと。
+   */
+  getViewerHitFromFrame(frame: XRFrame): { pos: Vec3; hitResult: XRHitTestResult } | null {
+    if (!this.hitTestSource || !this.refSpace) return null;
+    const results = frame.getHitTestResults(this.hitTestSource);
+    if (results.length === 0) return null;
+    const pose = results[0].getPose(this.refSpace);
+    if (!pose) return null;
+    const p = pose.transform.position;
+    return { pos: { x: p.x, y: p.y, z: p.z }, hitResult: results[0] };
+  }
+
   private onXRFrame = (_time: number, frame?: XRFrame): void => {
     if (!frame || !this.refSpace || !this.renderer) return;
 

@@ -7,6 +7,7 @@ export interface UIActions {
   onCloseSettings(s: GameSettings): void;
   onConfirmHide(): void;
   onStartSeek(): void;
+  onResync(): void;
   onRetry(): void;
 }
 
@@ -121,6 +122,8 @@ export class OverlayUI {
   private hideProgressEl!: HTMLElement;
   private timerHideEl!: HTMLElement;
   private timerSeekEl!: HTMLElement;
+  private seekRemainingEl!: HTMLElement;
+  private resyncBtn!: HTMLButtonElement;
   private cooldownRing!: SVGCircleElement;
   private cooldownWrap!: HTMLElement;
   private radarGlowEl!: HTMLElement;
@@ -403,6 +406,12 @@ export class OverlayUI {
       <div class="hud-corner hud-tl">
         <p class="eyebrow">${icon('lantern')} <ruby>探<rt>さが</rt></ruby>す番</p>
         <div class="timer-pad" data-role="timer"></div>
+        <div class="timer-pad" data-role="seek-remaining"></div>
+      </div>
+      <div class="bottom-bar">
+        <div class="button-row">
+          <button type="button" class="btn" data-action="resync" hidden>${icon('compass')} コインのズレなおし</button>
+        </div>
       </div>
       <div class="cooldown-wrap" data-role="cooldown-wrap" hidden>
         <svg viewBox="0 0 48 48" class="cooldown-ring">
@@ -412,6 +421,9 @@ export class OverlayUI {
       </div>
     `;
     this.timerSeekEl = screen.querySelector('[data-role="timer"]') as HTMLElement;
+    this.seekRemainingEl = screen.querySelector('[data-role="seek-remaining"]') as HTMLElement;
+    this.resyncBtn = screen.querySelector('[data-action="resync"]') as HTMLButtonElement;
+    this.resyncBtn.addEventListener('click', () => this.actions.onResync());
     this.radarGlowEl = screen.querySelector('[data-role="radar-glow"]') as HTMLElement;
     this.cooldownWrap = screen.querySelector('[data-role="cooldown-wrap"]') as HTMLElement;
     this.cooldownRing = screen.querySelector('[data-role="cooldown-ring"]') as unknown as SVGCircleElement;
@@ -488,7 +500,10 @@ export class OverlayUI {
     if (phase === 'error') {
       this.errorMsgEl.textContent = ctx?.errorMsg ?? '不明なエラーが発生しました。';
     }
-    if (phase !== 'seek') {
+    if (phase === 'seek') {
+      // ズレなおしボタンはコインモード専用(宝箱は埋まっていて見た目とのズレが問題にならない)
+      this.resyncBtn.hidden = this.settings?.gameMode !== 'coin';
+    } else {
       this.setRadarGlow(null);
       this.updateCooldown(0);
     }
@@ -561,6 +576,13 @@ export class OverlayUI {
 
   setConfirmEnabled(enabled: boolean): void {
     this.confirmHideBtn.disabled = !enabled;
+  }
+
+  /** 探索ターンの「のこり◯こ」表示を更新する。 */
+  updateSeekRemaining(remaining: number): void {
+    const iconName = this.settings?.gameMode === 'coin' ? 'coin' : 'chest';
+    // remainingは内部カウンタ(数値)のみでユーザー入力はないため、アイコン表示にinnerHTMLを使う
+    this.seekRemainingEl.innerHTML = `${icon(iconName)} のこり ${remaining}こ`;
   }
 
   updateHideProgress(placed: number, total: number): void {
