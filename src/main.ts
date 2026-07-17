@@ -117,6 +117,10 @@ const actions: UIActions = {
     // hit-test結果はXRフレーム内でしか安全に扱えないため、次のフレームループで処理する
     resyncPending = true;
   },
+  onGoHome: () => {
+    // 確認ダイアログ承諾後に呼ばれる。セッションを終了してタイトルへ戻る(試合は破棄)。
+    handleRetry();
+  },
   onRetry: () => {
     handleRetry();
   },

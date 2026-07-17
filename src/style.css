@@ -455,6 +455,71 @@ li {
   left: 12px;
 }
 
+.hud-tr {
+  top: max(12px, env(safe-area-inset-top));
+  right: 12px;
+}
+
+/* ホームボタン(隠す/探す画面の右上)。最小48pxのタップ領域を確保する */
+.btn-home {
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 12px;
+}
+
+.btn-home .icon {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+/* -------------------------------------------------------------------------
+   タイトルへ戻る確認ダイアログ
+   ------------------------------------------------------------------------- */
+
+.quit-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 6, 2, 0.55);
+}
+
+.quit-confirm[hidden] {
+  display: none;
+}
+
+.quit-confirm-panel {
+  background: var(--hud-panel-strong);
+  border: 1px solid var(--brass);
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  max-width: 320px;
+  text-align: center;
+  color: var(--paper);
+}
+
+.quit-confirm-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.quit-confirm-note {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.quit-confirm .button-row {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
 .timer-pad {
   display: inline-block;
   background: var(--hud-panel-strong);

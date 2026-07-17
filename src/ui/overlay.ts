@@ -8,6 +8,7 @@ export interface UIActions {
   onConfirmHide(): void;
   onStartSeek(): void;
   onResync(): void;
+  onGoHome(): void;
   onRetry(): void;
 }
 
@@ -132,6 +133,7 @@ export class OverlayUI {
   private toastContainer!: HTMLElement;
   private motionGuideEl!: HTMLElement;
   private motionGuideHideTimerId: ReturnType<typeof setTimeout> | null = null;
+  private quitConfirmEl!: HTMLElement;
 
   private vibrationEnabled = true;
   private vibrateTimerId: ReturnType<typeof setInterval> | null = null;
@@ -185,6 +187,35 @@ export class OverlayUI {
     `;
     this.root.appendChild(this.motionGuideEl);
 
+    // ホームボタン押下時の確認ダイアログ(ゲーム中の誤タップによる即中断を防ぐ)
+    this.quitConfirmEl = el('div', 'quit-confirm');
+    this.quitConfirmEl.hidden = true;
+    // 静的テンプレートのみ(動的値なし)のためinnerHTMLを許容する
+    this.quitConfirmEl.innerHTML = `
+      <div class="quit-confirm-panel">
+        <p class="quit-confirm-title">${icon('home')} タイトルにもどる？</p>
+        <p class="quit-confirm-note">いまのゲームはさいしょからになるよ</p>
+        <div class="button-row">
+          <button type="button" class="btn" data-action="quit-cancel">つづける</button>
+          <button type="button" class="btn btn-primary" data-action="quit-ok">もどる</button>
+        </div>
+      </div>
+    `;
+    (this.quitConfirmEl.querySelector('[data-action="quit-cancel"]') as HTMLButtonElement).addEventListener(
+      'click',
+      () => {
+        this.quitConfirmEl.hidden = true;
+      },
+    );
+    (this.quitConfirmEl.querySelector('[data-action="quit-ok"]') as HTMLButtonElement).addEventListener(
+      'click',
+      () => {
+        this.quitConfirmEl.hidden = true;
+        this.actions.onGoHome();
+      },
+    );
+    this.root.appendChild(this.quitConfirmEl);
+
     this.installBeforeXrSelectGuard();
 
     return { title, settings, hide, handover, seek, result, error };
@@ -198,7 +229,8 @@ export class OverlayUI {
   private installBeforeXrSelectGuard(): void {
     this.root.addEventListener('beforexrselect', (ev) => {
       const target = ev.target as HTMLElement | null;
-      if (target && target.closest('button, a, input, select, textarea, label')) {
+      // .quit-confirmは全面ダイアログのため、背景部分のタップでもAR selectを発火させない
+      if (target && target.closest('button, a, input, select, textarea, label, .quit-confirm')) {
         ev.preventDefault();
       }
     });
@@ -355,6 +387,9 @@ export class OverlayUI {
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="hide-progress"></div>
       </div>
+      <div class="hud-corner hud-tr">
+        <button type="button" class="btn btn-home" data-action="home" aria-label="タイトルにもどる">${icon('home')}</button>
+      </div>
       <div class="guide-pad" data-role="hide-guide"></div>
       <div class="bottom-bar">
         <div class="button-row">
@@ -371,6 +406,9 @@ export class OverlayUI {
     this.hideProgressEl = screen.querySelector('[data-role="hide-progress"]') as HTMLElement;
     this.confirmHideBtn = screen.querySelector('[data-action="confirm-hide"]') as HTMLButtonElement;
     this.confirmHideBtn.addEventListener('click', () => this.actions.onConfirmHide());
+    (screen.querySelector('[data-action="home"]') as HTMLButtonElement).addEventListener('click', () => {
+      this.quitConfirmEl.hidden = false;
+    });
     return screen;
   }
 
@@ -408,6 +446,9 @@ export class OverlayUI {
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="seek-remaining"></div>
       </div>
+      <div class="hud-corner hud-tr">
+        <button type="button" class="btn btn-home" data-action="home" aria-label="タイトルにもどる">${icon('home')}</button>
+      </div>
       <div class="bottom-bar">
         <div class="button-row">
           <button type="button" class="btn" data-action="resync" hidden>${icon('compass')} コインのズレなおし</button>
@@ -428,6 +469,9 @@ export class OverlayUI {
     this.cooldownWrap = screen.querySelector('[data-role="cooldown-wrap"]') as HTMLElement;
     this.cooldownRing = screen.querySelector('[data-role="cooldown-ring"]') as unknown as SVGCircleElement;
     this.cooldownRing.style.strokeDasharray = `${OverlayUI.COOLDOWN_CIRC}`;
+    (screen.querySelector('[data-action="home"]') as HTMLButtonElement).addEventListener('click', () => {
+      this.quitConfirmEl.hidden = false;
+    });
 
     return screen;
   }
@@ -486,6 +530,7 @@ export class OverlayUI {
     for (const key of Object.keys(this.screens) as GamePhase[]) {
       this.screens[key].classList.toggle('active', key === phase);
     }
+    this.quitConfirmEl.hidden = true;
 
     if (phase === 'settings' && this.settings) {
       this.applySettingsToForm(this.settings);
