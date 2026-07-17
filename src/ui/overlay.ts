@@ -58,20 +58,20 @@ interface ModeMeta {
 const MODE_META: Record<GameMode, ModeMeta> = {
   chest: {
     optionIcon: 'chest',
-    optionLabel: '<ruby>宝箱<rt>たからばこ</rt></ruby>をほる',
+    optionLabel: '<ruby>宝箱<rt>たからばこ</rt></ruby>をかくす',
     hideEyebrowIcon: 'spade',
-    hideGuide: 'タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(さいごの1こは置きなおしOK)',
-    confirmLabel: 'ここにうめる！',
+    hideGuide: 'タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(2回タップすると消せるよ)',
+    confirmLabel: 'じゅんびOK！',
     confirmIcon: 'chest',
     successMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ発見！さがす人のかち！',
     forfeitMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、かくす人のまけ',
   },
   coin: {
     optionIcon: 'coin',
-    optionLabel: 'コインをあつめる',
+    optionLabel: 'コインをかくす',
     hideEyebrowIcon: 'coin',
-    hideGuide: 'タップしてコインを置こう!(さいごの1こは置きなおしOK)',
-    confirmLabel: 'ここに置く！',
+    hideGuide: 'タップしてコインを置こう!(2回タップすると消せるよ)',
+    confirmLabel: 'じゅんびOK！',
     confirmIcon: 'coin',
     successMessage: 'コインぜんぶかいしゅう！さがす人のかち！',
     forfeitMessage: 'コインを置けなかったので、かくす人のまけ',
@@ -251,7 +251,7 @@ export class OverlayUI {
           <li>わたすとき: 画面を消したり伏せたりしないで、さがす人にわたそう。</li>
           <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップしてほって、レーダーをたよりに宝箱を見つけよう!</li>
         </ol>
-        <p class="notice">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby>で「<ruby>宝箱<rt>たからばこ</rt></ruby>をほる」か「コインをあつめる」かをえらべるよ。</p>
+        <p class="notice">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby>で「<ruby>宝箱<rt>たからばこ</rt></ruby>をかくす」か「コインをかくす」かをえらべるよ。</p>
         <p class="notice">つかえる機種: ARCore対応のAndroid + Chrome。iPhoneでは遊べません。</p>
         <p class="notice">カメラの映像はARの表示だけに使われ、保存や外部そうしんは一切ありません。</p>
       </div>
@@ -424,7 +424,7 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-handover opaque');
     screen.innerHTML = `
       <p class="eyebrow">${icon('hourglass')} わたすとき</p>
-      <div class="handover-warning">${icon('warning')} 画面を消したり、下に向けたりしないでね!(宝の場所がわからなくなっちゃうよ)</div>
+      <div class="handover-warning">${icon('warning')} 画面を消さないでね!(宝の場所がわからなくなっちゃうよ)</div>
       <div class="bottom-bar">
         <div class="button-row">
           <button type="button" class="btn btn-primary btn-large" data-action="start-seek">たんけんスタート！${icon('lantern')}</button>
