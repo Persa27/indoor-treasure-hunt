@@ -69,10 +69,16 @@ const HIDE_DELETE_TAP_NEAR_M = 0.3;
 const HIDE_DOUBLE_TAP_MS = 600;
 // ズレなおし: 画面中央のhit-test点から1m以内の未回収コインを置き直す
 const RESYNC_SNAP_M = 1.0;
+// 「たんけんスタート」ボタンのタップがそのままselectとして発火し発掘扱いになるのを防ぐ猶予時間
+const SEEK_INPUT_GRACE_MS = 700;
 
 let lastHideTapSlot: TreasureSlot | null = null;
 let lastHideTapAtMs = 0;
 let resyncPending = false;
+let seekStartedAtMs = 0;
+// レーダーの稼働フラグ。stopSeekLoops後、結果画面へ遷移するまでの間(フェーズはまだseek)に
+// フレームループがレーダーを再始動してしまい、結果画面で音が鳴り続けるのを防ぐ。
+let radarActive = false;
 
 let cooldownIntervalId: ReturnType<typeof setInterval> | null = null;
 let resultTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -109,6 +115,8 @@ const actions: UIActions = {
     timer.start(settings.seekTimeSec, (remain) => overlay.updateTimer(remain), onSeekTimeExpire);
     session?.setSelectEnabled(true);
     startCooldownPolling();
+    seekStartedAtMs = performance.now();
+    radarActive = true;
     state.startSeek();
     overlay.updateSeekRemaining(remainingCount());
   },
@@ -142,7 +150,7 @@ const sessionCallbacks: ARSessionCallbacks = {
   },
   onTrackingChange(degraded) {
     if (degraded) {
-      overlay.toast(`${icon('compass')} ちょっと道に迷ったかも。明るい場所でゆっくり動かしてね`);
+      overlay.toast(`${icon('compass')} ちょっと<ruby>道<rt>みち</rt></ruby>に<ruby>迷<rt>まよ</rt></ruby>ったかも。<br><ruby>明<rt>あか</rt></ruby>るい<ruby>場所<rt>ばしょ</rt></ruby>でゆっくり<ruby>動<rt>うご</rt></ruby>かしてね`);
     }
   },
   onSessionEnd() {
@@ -189,7 +197,7 @@ const frameHook: ARFrameHook = (frame, refSpace) => {
   }
 
   // レーダーは探索ターン中は常時起動(SPEC 3.5)。ターン終了時はstopSeekLoopsで必ず停止する。
-  if (state.getPhase() === 'seek' && viewerPos) {
+  if (radarActive && state.getPhase() === 'seek' && viewerPos) {
     const nearest = nearestRemainingTreasurePos(viewerPos);
     if (nearest) {
       const fb = computeRadar(viewerPos, nearest, settings);
@@ -237,20 +245,20 @@ function processResync(frame: XRFrame): void {
 
   const viewerHit = session.getViewerHitFromFrame(frame);
   if (!viewerHit) {
-    overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
+    overlay.showMoveGuide(`${icon('magnifier')} ゆかや<ruby>棚<rt>たな</rt></ruby>が<ruby>見<rt>み</rt></ruby>つからないよ。<br>スマホを8の<ruby>字<rt>じ</rt></ruby>に<ruby>動<rt>うご</rt></ruby>かしてね`);
     return;
   }
 
   const slot = findSlotNear(viewerHit.pos, RESYNC_SNAP_M);
   if (!slot) {
-    overlay.toast(`${icon('compass')} コインの近くで、コインを画面のまんなかにうつして押してね`);
+    overlay.toast(`${icon('compass')} コインの<ruby>近<rt>ちか</rt></ruby>くで、<br>コインを<ruby>画面<rt>がめん</rt></ruby>のまんなかにうつして<ruby>押<rt>お</rt></ruby>してね`);
     return;
   }
 
   void slot.anchor.place(viewerHit.pos, viewerHit.hitResult);
   slot.hiddenByDistance = false;
   slot.view.showAt(viewerHit.pos);
-  overlay.toast(`${icon('coin')} コインの場所をなおしたよ！`);
+  overlay.toast(`${icon('coin')} コインの<ruby>場所<rt>ばしょ</rt></ruby>をなおしたよ！`);
 }
 
 function nearestRemainingTreasurePos(from: Vec3): Vec3 | null {
@@ -308,7 +316,7 @@ function handleSelect(hit: Vec3 | null): void {
   const phase = state.getPhase();
   if (phase === 'hide') {
     if (!hit) {
-      overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
+      overlay.showMoveGuide(`${icon('magnifier')} ゆかや<ruby>棚<rt>たな</rt></ruby>が<ruby>見<rt>み</rt></ruby>つからないよ。<br>スマホを8の<ruby>字<rt>じ</rt></ruby>に<ruby>動<rt>うご</rt></ruby>かしてね`);
       return;
     }
 
@@ -320,13 +328,13 @@ function handleSelect(hit: Vec3 | null): void {
       if (nearSlot === lastHideTapSlot && now - lastHideTapAtMs <= HIDE_DOUBLE_TAP_MS) {
         lastHideTapSlot = null;
         removeTreasureSlot(nearSlot);
-        overlay.toast(`${icon('spade')} けしたよ！べつの場所に置けるよ`);
+        overlay.toast(`${icon('spade')} けしたよ！べつの<ruby>場所<rt>ばしょ</rt></ruby>に<ruby>置<rt>お</rt></ruby>けるよ`);
         overlay.updateHideProgress(treasures.length, settings.treasureCount);
         overlay.setConfirmEnabled(treasures.length >= settings.treasureCount);
       } else {
         lastHideTapSlot = nearSlot;
         lastHideTapAtMs = now;
-        overlay.toast(`もういちどすばやくタップすると消せるよ`);
+        overlay.toast(`もういちどすばやくタップすると<ruby>消<rt>け</rt></ruby>せるよ`);
       }
       return;
     }
@@ -384,9 +392,12 @@ function finishHideTurn(placed: boolean): void {
 // ---------------------------------------------------------------------
 
 function handleSeekSelect(hit: Vec3 | null): void {
+  // 「たんけんスタート」ボタンのタップ由来のselectが探索開始直後に届くことがあるため、
+  // 開始直後の短い猶予時間はタップを発掘試行と見なさない(インターバルも発生させない)。
+  if (performance.now() - seekStartedAtMs < SEEK_INPUT_GRACE_MS) return;
   if (!judge || judge.isCoolingDown()) return;
   if (!hit) {
-    overlay.showMoveGuide(`${icon('magnifier')} ゆかや棚が見つからないよ。スマホを8の字に動かしてね`);
+    overlay.showMoveGuide(`${icon('magnifier')} ゆかや<ruby>棚<rt>たな</rt></ruby>が<ruby>見<rt>み</rt></ruby>つからないよ。<br>スマホを8の<ruby>字<rt>じ</rt></ruby>に<ruby>動<rt>うご</rt></ruby>かしてね`);
     return;
   }
 
@@ -417,6 +428,7 @@ function handleSeekSelect(hit: Vec3 | null): void {
 }
 
 function stopSeekLoops(): void {
+  radarActive = false;
   timer.stop();
   session?.setSelectEnabled(false);
   stopCooldownPolling();
@@ -520,6 +532,8 @@ function resetMatchState(): void {
   lastHideTapSlot = null;
   lastHideTapAtMs = 0;
   resyncPending = false;
+  seekStartedAtMs = 0;
+  radarActive = false;
 }
 
 function handleRetry(): void {

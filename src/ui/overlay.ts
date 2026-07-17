@@ -32,15 +32,15 @@ interface NumericFieldDef {
 }
 
 const NUMERIC_FIELDS: NumericFieldDef[] = [
-  { key: 'treasureCount', label: 'たからの数', min: 1, max: 5, step: 1, unit: '個' },
-  { key: 'hideTimeSec', label: '<ruby>隠<rt>かく</rt></ruby>す時間', min: 15, max: 300, step: 1, unit: '秒' },
-  { key: 'seekTimeSec', label: '<ruby>探<rt>さが</rt></ruby>す時間', min: 30, max: 600, step: 1, unit: '秒' },
+  { key: 'treasureCount', label: 'たからの<ruby>数<rt>かず</rt></ruby>', min: 1, max: 5, step: 1, unit: 'こ' },
+  { key: 'hideTimeSec', label: '<ruby>隠<rt>かく</rt></ruby>す<ruby>時間<rt>じかん</rt></ruby>', min: 15, max: 300, step: 1, unit: 'びょう' },
+  { key: 'seekTimeSec', label: '<ruby>探<rt>さが</rt></ruby>す<ruby>時間<rt>じかん</rt></ruby>', min: 30, max: 600, step: 1, unit: 'びょう' },
   { key: 'successRadiusM', label: 'あたり<ruby>半径<rt>はんけい</rt></ruby>', min: 0.2, max: 1.5, step: 0.05, unit: 'm' },
-  { key: 'digCooldownSec', label: 'つぎまでのまち時間', min: 0, max: 10, step: 0.5, unit: '秒' },
-  { key: 'coinVisibleDistM', label: 'コインが見えるきょり', min: 0.5, max: 10, step: 0.5, unit: 'm' },
-  { key: 'radarNearM', label: 'レーダー近しきい値', min: 0.1, max: 5, step: 0.1, unit: 'm' },
-  { key: 'radarMidM', label: 'レーダー中しきい値', min: 0.1, max: 10, step: 0.1, unit: 'm' },
-  { key: 'radarFarM', label: 'レーダー遠しきい値', min: 0.1, max: 20, step: 0.1, unit: 'm' },
+  { key: 'digCooldownSec', label: 'つぎまでのまち<ruby>時間<rt>じかん</rt></ruby>', min: 0, max: 10, step: 0.5, unit: 'びょう' },
+  { key: 'coinVisibleDistM', label: 'コインが<ruby>見<rt>み</rt></ruby>えるきょり', min: 0.5, max: 10, step: 0.5, unit: 'm' },
+  { key: 'radarNearM', label: 'レーダー<ruby>近<rt>ちか</rt></ruby>しきい<ruby>値<rt>ち</rt></ruby>', min: 0.1, max: 5, step: 0.1, unit: 'm' },
+  { key: 'radarMidM', label: 'レーダー<ruby>中<rt>なか</rt></ruby>しきい<ruby>値<rt>ち</rt></ruby>', min: 0.1, max: 10, step: 0.1, unit: 'm' },
+  { key: 'radarFarM', label: 'レーダー<ruby>遠<rt>とお</rt></ruby>しきい<ruby>値<rt>ち</rt></ruby>', min: 0.1, max: 20, step: 0.1, unit: 'm' },
 ];
 
 // あそびかた(宝箱モード/コインモード)ごとの文言・アイコンの差し替え定義
@@ -60,21 +60,25 @@ const MODE_META: Record<GameMode, ModeMeta> = {
     optionIcon: 'chest',
     optionLabel: '<ruby>宝箱<rt>たからばこ</rt></ruby>をかくす',
     hideEyebrowIcon: 'spade',
-    hideGuide: 'タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!(2回タップすると消せるよ)',
+    hideGuide:
+      'タップして<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう!<br>(2<ruby>回<rt>かい</rt></ruby>タップすると<ruby>消<rt>け</rt></ruby>せるよ)',
     confirmLabel: 'じゅんびOK！',
     confirmIcon: 'chest',
-    successMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ発見！さがす人のかち！',
-    forfeitMessage: '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、かくす人のまけ',
+    successMessage:
+      '<ruby>宝箱<rt>たからばこ</rt></ruby>ぜんぶ<ruby>発見<rt>はっけん</rt></ruby>！<br>さがす<ruby>人<rt>ひと</rt></ruby>のかち！',
+    forfeitMessage:
+      '<ruby>宝箱<rt>たからばこ</rt></ruby>をうめられなかったので、<br>かくす<ruby>人<rt>ひと</rt></ruby>のまけ',
   },
   coin: {
     optionIcon: 'coin',
     optionLabel: 'コインをかくす',
     hideEyebrowIcon: 'coin',
-    hideGuide: 'タップしてコインを置こう!(2回タップすると消せるよ)',
+    hideGuide:
+      'タップしてコインを<ruby>置<rt>お</rt></ruby>こう!<br>(2<ruby>回<rt>かい</rt></ruby>タップすると<ruby>消<rt>け</rt></ruby>せるよ)',
     confirmLabel: 'じゅんびOK！',
     confirmIcon: 'coin',
-    successMessage: 'コインぜんぶかいしゅう！さがす人のかち！',
-    forfeitMessage: 'コインを置けなかったので、かくす人のまけ',
+    successMessage: 'コインぜんぶかいしゅう！<br>さがす<ruby>人<rt>ひと</rt></ruby>のかち！',
+    forfeitMessage: 'コインを<ruby>置<rt>お</rt></ruby>けなかったので、<br>かくす<ruby>人<rt>ひと</rt></ruby>のまけ',
   },
 };
 
@@ -82,8 +86,8 @@ function resultMessage(result: GameResult, mode: GameMode): string {
   const meta = MODE_META[mode];
   if (result === 'seeker-win') return meta.successMessage;
   if (result === 'hider-forfeit') return meta.forfeitMessage;
-  if (result === 'hider-win') return 'じかんぎれ！かくす人のかち！';
-  return 'ARがうまく動かなかったので、引き分け';
+  if (result === 'hider-win') return 'じかんぎれ！<br>かくす<ruby>人<rt>ひと</rt></ruby>のかち！';
+  return 'ARがうまく<ruby>動<rt>うご</rt></ruby>かなかったので、<br><ruby>引<rt>ひ</rt></ruby>き<ruby>分<rt>わ</rt></ruby>け';
 }
 
 const RADAR_LEVELS: RadarLevel[] = ['far', 'mid', 'near', 'hot'];
@@ -155,7 +159,8 @@ export class OverlayUI {
     this.root.textContent = '';
 
     const landscapeWarning = el('div', 'landscape-warning');
-    landscapeWarning.innerHTML = '<p>縦向きでご利用ください</p>';
+    landscapeWarning.innerHTML =
+      '<p><ruby>縦向<rt>たてむ</rt></ruby>きでご<ruby>利用<rt>りよう</rt></ruby>ください</p>';
     this.root.appendChild(landscapeWarning);
 
     const title = this.buildTitle();
@@ -246,14 +251,14 @@ export class OverlayUI {
       <div class="howto">
         <p class="eyebrow eyebrow-sub">${icon('map')} あそびかた</p>
         <ol>
-          <li>1台のスマホを2人で<ruby>交代<rt>こうたい</rt></ruby>してつかうよ。</li>
-          <li><ruby>隠<rt>かく</rt></ruby>す人: スマホをかざして、ゆかや家具の上にたからをかくそう。</li>
-          <li>わたすとき: 画面を消さないで、さがす人にわたそう。</li>
-          <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップして、レーダーをたよりにたからを見つけよう!</li>
+          <li>1<ruby>台<rt>だい</rt></ruby>のスマホを<ruby>2人<rt>ふたり</rt></ruby>で<ruby>交代<rt>こうたい</rt></ruby>してつかうよ。</li>
+          <li><ruby>隠<rt>かく</rt></ruby>す<ruby>人<rt>ひと</rt></ruby>: スマホをかざして、ゆかや<ruby>家具<rt>かぐ</rt></ruby>の<ruby>上<rt>うえ</rt></ruby>にたからをかくそう。</li>
+          <li>わたすとき: <ruby>画面<rt>がめん</rt></ruby>を<ruby>消<rt>け</rt></ruby>さないで、さがす<ruby>人<rt>ひと</rt></ruby>にわたそう。</li>
+          <li><ruby>探<rt>さが</rt></ruby>す<ruby>人<rt>ひと</rt></ruby>: <ruby>画面<rt>がめん</rt></ruby>をタップして、レーダーをたよりにたからを<ruby>見<rt>み</rt></ruby>つけよう!</li>
         </ol>
         <p class="notice">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby>で「<ruby>宝箱<rt>たからばこ</rt></ruby>をかくす」か「コインをかくす」かをえらべるよ。</p>
-        <p class="notice">つかえる機種: ARCore対応のAndroid + Chrome。iPhoneでは遊べません。</p>
-        <p class="notice">カメラの映像はARの表示だけに使われ、保存や外部そうしんは一切ありません。</p>
+        <p class="notice">つかえる<ruby>機種<rt>きしゅ</rt></ruby>: ARCore<ruby>対応<rt>たいおう</rt></ruby>のAndroid + Chrome。<br>iPhoneでは<ruby>遊<rt>あそ</rt></ruby>べません。</p>
+        <p class="notice">カメラの<ruby>映像<rt>えいぞう</rt></ruby>はARの<ruby>表示<rt>ひょうじ</rt></ruby>だけに<ruby>使<rt>つか</rt></ruby>われ、<br><ruby>保存<rt>ほぞん</rt></ruby>や<ruby>外部<rt>がいぶ</rt></ruby>そうしんは<ruby>一切<rt>いっさい</rt></ruby>ありません。</p>
       </div>
       <div class="bottom-bar">
         <p class="start-reason" data-role="start-reason"></p>
@@ -370,7 +375,8 @@ export class OverlayUI {
     const buttonRow = el('div', 'button-row');
     const saveBtn = el('button', 'btn btn-primary');
     saveBtn.type = 'button';
-    saveBtn.textContent = '保存して戻る';
+    // 静的文言のみ(動的値なし)のためinnerHTMLでルビ表示を許容する
+    saveBtn.innerHTML = '<ruby>保存<rt>ほぞん</rt></ruby>して<ruby>戻<rt>もど</rt></ruby>る';
     saveBtn.addEventListener('click', () => this.handleSaveSettings());
     buttonRow.appendChild(saveBtn);
     bottomBar.appendChild(buttonRow);
@@ -383,7 +389,7 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-hide');
     screen.innerHTML = `
       <div class="hud-corner hud-tl">
-        <p class="eyebrow"><span data-role="hide-eyebrow-icon"></span> <ruby>隠<rt>かく</rt></ruby>す番</p>
+        <p class="eyebrow"><span data-role="hide-eyebrow-icon"></span> <ruby>隠<rt>かく</rt></ruby>す<ruby>番<rt>ばん</rt></ruby></p>
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="hide-progress"></div>
       </div>
@@ -424,7 +430,7 @@ export class OverlayUI {
     const screen = el('section', 'screen screen-handover opaque');
     screen.innerHTML = `
       <p class="eyebrow">${icon('hourglass')} わたすとき</p>
-      <div class="handover-warning">${icon('warning')} 画面を消さないでね!(宝の場所がわからなくなっちゃうよ)</div>
+      <div class="handover-warning">${icon('warning')} <ruby>画面<rt>がめん</rt></ruby>を<ruby>消<rt>け</rt></ruby>さないでね!<br>(<ruby>宝<rt>たから</rt></ruby>の<ruby>場所<rt>ばしょ</rt></ruby>がわからなくなっちゃうよ)</div>
       <div class="bottom-bar">
         <div class="button-row">
           <button type="button" class="btn btn-primary btn-large" data-action="start-seek">たんけんスタート！${icon('lantern')}</button>
@@ -442,7 +448,7 @@ export class OverlayUI {
     screen.innerHTML = `
       <div class="radar-glow" data-role="radar-glow"></div>
       <div class="hud-corner hud-tl">
-        <p class="eyebrow">${icon('lantern')} <ruby>探<rt>さが</rt></ruby>す番</p>
+        <p class="eyebrow">${icon('lantern')} <ruby>探<rt>さが</rt></ruby>す<ruby>番<rt>ばん</rt></ruby></p>
         <div class="timer-pad" data-role="timer"></div>
         <div class="timer-pad" data-role="seek-remaining"></div>
       </div>
@@ -555,9 +561,10 @@ export class OverlayUI {
   }
 
   updateTimer(remainSec: number): void {
-    const text = `のこり ${Math.max(0, Math.ceil(remainSec))}秒`;
-    this.timerHideEl.textContent = text;
-    this.timerSeekEl.textContent = text;
+    // 残り秒数は内部カウンタ(数値)のみでユーザー入力はないため、ルビ表示にinnerHTMLを使う
+    const text = `のこり ${Math.max(0, Math.ceil(remainSec))}<ruby>秒<rt>びょう</rt></ruby>`;
+    this.timerHideEl.innerHTML = text;
+    this.timerSeekEl.innerHTML = text;
   }
 
   updateCooldown(remainMs: number): void {
@@ -633,7 +640,8 @@ export class OverlayUI {
   updateHideProgress(placed: number, total: number): void {
     const iconName = this.settings?.gameMode === 'coin' ? 'coin' : 'chest';
     // placed/totalは内部カウンタ(数値)のみでユーザー入力はないため、アイコン表示にinnerHTMLを使う
-    this.hideProgressEl.innerHTML = total > 1 ? `${icon(iconName)} おいた数: ${placed} / ${total}` : '';
+    this.hideProgressEl.innerHTML =
+      total > 1 ? `${icon(iconName)} おいた<ruby>数<rt>かず</rt></ruby>: ${placed} / ${total}` : '';
   }
 
   // msgは呼び出し側の固定文言のみを渡す想定(ユーザー入力は含めない)のためinnerHTMLでアイコン表示を許容する
