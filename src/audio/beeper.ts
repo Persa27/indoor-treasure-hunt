@@ -137,6 +137,37 @@ export class Beeper {
     }, sparkleDelayMs);
   }
 
+  /** 全部見つけて勝ったときの勝利ファンファーレ。「パパパパーン!」の定番進行+和音で
+   * playSuccessより長く豪華に鳴らす(SPEC 6.5)。 */
+  playVictoryFanfare(): void {
+    if (!this.enabled) return;
+    const ctx = this.ensureContext();
+    if (!ctx || ctx.state === 'suspended') return;
+
+    // [遅延ms, 周波数Hz, 長さsec] トランペット風の「パパパ パーン!」
+    const G5 = 783.99;
+    const C6 = 1046.5;
+    const E6 = 1318.5;
+    const G6 = 1567.98;
+    const phrase: Array<[number, number, number]> = [
+      [0, G5, 0.12],
+      [150, G5, 0.12],
+      [300, G5, 0.12],
+      [450, C6, 0.5],
+      [1000, E6, 0.12],
+      [1150, G6, 0.7],
+    ];
+    for (const [delayMs, freq, dur] of phrase) {
+      setTimeout(() => this.playTone(freq, dur, 0.3, 'square'), delayMs);
+    }
+    // 最後の音に重ねる祝福の和音(C6+E6+G6)とキラキラ高音
+    setTimeout(() => {
+      this.playTone(C6, 0.7, 0.14, 'triangle');
+      this.playTone(E6, 0.7, 0.12, 'triangle');
+      this.playTone(2093, 0.5, 0.1, 'sine'); // C7
+    }, 1150);
+  }
+
   /** スコップで掘る「ポフッ」という軽くコミカルな短い音(子ども向けに柔らかく)。 */
   playMiss(): void {
     if (!this.enabled) return;

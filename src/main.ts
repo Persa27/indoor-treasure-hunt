@@ -443,6 +443,7 @@ function handleSeekSuccess(slot: TreasureSlot): void {
   stopSeekLoops();
   resultTimeoutId = setTimeout(() => {
     resultTimeoutId = null;
+    beeper.playVictoryFanfare();
     state.finishSeek('seeker-win');
   }, 1500);
 }
