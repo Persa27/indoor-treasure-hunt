@@ -129,10 +129,7 @@ rt {
   color: var(--parchment-text);
 }
 
-.screen-title .eyebrow,
-.screen-settings .eyebrow,
-.screen-result .eyebrow,
-.screen-error .eyebrow,
+/* .eyebrowは木札風タグ(濃背景+明文字)のため、羊皮紙用の濃い文字色の上書き対象に含めない */
 .screen-title h1,
 .screen-settings h1,
 .screen-result h1,
