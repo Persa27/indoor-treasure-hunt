@@ -247,9 +247,9 @@ export class OverlayUI {
         <p class="eyebrow eyebrow-sub">${icon('map')} あそびかた</p>
         <ol>
           <li>1台のスマホを2人で<ruby>交代<rt>こうたい</rt></ruby>してつかうよ。</li>
-          <li><ruby>隠<rt>かく</rt></ruby>す人: スマホをかざして、ゆかや家具の上に<ruby>宝箱<rt>たからばこ</rt></ruby>をうめよう。</li>
-          <li>わたすとき: 画面を消したり伏せたりしないで、さがす人にわたそう。</li>
-          <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップしてほって、レーダーをたよりに宝箱を見つけよう!</li>
+          <li><ruby>隠<rt>かく</rt></ruby>す人: スマホをかざして、ゆかや家具の上にたからをかくそう。</li>
+          <li>わたすとき: 画面を消さないで、さがす人にわたそう。</li>
+          <li><ruby>探<rt>さが</rt></ruby>す人: 画面をタップして、レーダーをたよりにたからを見つけよう!</li>
         </ol>
         <p class="notice">${icon('gear')} <ruby>設定<rt>せってい</rt></ruby>で「<ruby>宝箱<rt>たからばこ</rt></ruby>をかくす」か「コインをかくす」かをえらべるよ。</p>
         <p class="notice">つかえる機種: ARCore対応のAndroid + Chrome。iPhoneでは遊べません。</p>
@@ -631,8 +631,9 @@ export class OverlayUI {
   }
 
   updateHideProgress(placed: number, total: number): void {
+    const iconName = this.settings?.gameMode === 'coin' ? 'coin' : 'chest';
     // placed/totalは内部カウンタ(数値)のみでユーザー入力はないため、アイコン表示にinnerHTMLを使う
-    this.hideProgressEl.innerHTML = total > 1 ? `${icon('coin')} うめた数: ${placed} / ${total}` : '';
+    this.hideProgressEl.innerHTML = total > 1 ? `${icon(iconName)} おいた数: ${placed} / ${total}` : '';
   }
 
   // msgは呼び出し側の固定文言のみを渡す想定(ユーザー入力は含めない)のためinnerHTMLでアイコン表示を許容する
